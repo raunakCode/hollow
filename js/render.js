@@ -1,0 +1,402 @@
+// ---------------------------------------------------------------
+// HOLLOW - render.js : silhouettes, parallax, fog, light, post fx
+// ---------------------------------------------------------------
+'use strict';
+
+const Render = {
+  bgLayers: [],      // [{canvas, factor}]
+  grain: null,
+  rain: [],
+  motes: [],
+  darkCanvas: null,
+
+  init() {
+    // film grain tile
+    const g = document.createElement('canvas');
+    g.width = 160; g.height = 160;
+    const gc = g.getContext('2d');
+    const img = gc.createImageData(160, 160);
+    for (let i = 0; i < img.data.length; i += 4) {
+      const v = Math.random() * 255;
+      img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+      img.data[i + 3] = 26;
+    }
+    gc.putImageData(img, 0, 0);
+    this.grain = g;
+
+    this.darkCanvas = document.createElement('canvas');
+    this.darkCanvas.width = VIEW_W; this.darkCanvas.height = VIEW_H;
+
+    for (let i = 0; i < 160; i++)
+      this.rain.push({ x: Math.random() * VIEW_W, y: Math.random() * VIEW_H, s: 500 + Math.random() * 350, l: 10 + Math.random() * 14 });
+    for (let i = 0; i < 40; i++)
+      this.motes.push({ x: Math.random() * VIEW_W, y: Math.random() * VIEW_H, vx: 4 + Math.random() * 8, ph: Math.random() * 9 });
+  },
+
+  // ------------- parallax background generation -------------
+  buildBackground(kind, seed) {
+    this.bgLayers = [];
+    const rng = makeRng(seed);
+    const make = (factor, draw) => {
+      const c = document.createElement('canvas');
+      c.width = 2048; c.height = VIEW_H + 200;
+      draw(c.getContext('2d'), c.width, c.height);
+      this.bgLayers.push({ canvas: c, factor });
+    };
+
+    const treeLayer = (ctx, W, H, col, baseY, scale) => {
+      ctx.fillStyle = col;
+      let x = 0;
+      while (x < W) {
+        const tw = (10 + rng() * 22) * scale;
+        const th = (160 + rng() * 220) * scale;
+        // trunk
+        ctx.beginPath();
+        ctx.moveTo(x, baseY);
+        ctx.lineTo(x + tw * 0.34, baseY - th);
+        ctx.lineTo(x + tw * 0.66, baseY - th);
+        ctx.lineTo(x + tw, baseY);
+        ctx.fill();
+        // branches
+        const nb = 2 + Math.floor(rng() * 4);
+        for (let i = 0; i < nb; i++) {
+          const by = baseY - th * (0.4 + rng() * 0.55);
+          const bl = (26 + rng() * 60) * scale;
+          const dir = rng() < 0.5 ? -1 : 1;
+          ctx.save();
+          ctx.translate(x + tw / 2, by);
+          ctx.rotate(dir * (0.5 + rng() * 0.7));
+          ctx.fillRect(0, -2 * scale, bl, 4 * scale);
+          ctx.restore();
+        }
+        x += tw + 16 + rng() * 90;
+      }
+      ctx.fillRect(0, baseY, W, H - baseY);
+    };
+
+    const buildingLayer = (ctx, W, H, col, baseY, scale, lit) => {
+      ctx.fillStyle = col;
+      let x = 0;
+      while (x < W) {
+        const bw = (60 + rng() * 160) * scale;
+        const bh = (90 + rng() * 260) * scale;
+        ctx.fillRect(x, baseY - bh, bw, bh + (H - baseY));
+        if (rng() < 0.5) { // antenna / chimney
+          const ax = x + bw * rng();
+          ctx.fillRect(ax, baseY - bh - 38 * scale, 4 * scale, 40 * scale);
+        }
+        if (lit && rng() < 0.65) { // a few dim windows
+          ctx.save();
+          ctx.fillStyle = 'rgba(190,200,170,0.10)';
+          const nw = 1 + Math.floor(rng() * 4);
+          for (let i = 0; i < nw; i++)
+            ctx.fillRect(x + 8 + rng() * (bw - 20), baseY - bh + 10 + rng() * (bh - 30), 6, 9);
+          ctx.restore();
+          ctx.fillStyle = col;
+        }
+        x += bw + 20 + rng() * 110;
+      }
+      ctx.fillRect(0, baseY, W, H - baseY);
+    };
+
+    const pillarLayer = (ctx, W, H, col, scale) => {
+      ctx.fillStyle = col;
+      let x = 30;
+      while (x < W) {
+        const pw = (24 + rng() * 50) * scale;
+        ctx.fillRect(x, 0, pw, H);
+        if (rng() < 0.7) { // hanging cable
+          const cx0 = x + pw + 30 + rng() * 120;
+          const sag = 60 + rng() * 120;
+          ctx.beginPath();
+          ctx.moveTo(x + pw, 60 + rng() * 100);
+          ctx.quadraticCurveTo(cx0, sag + 160, cx0 + 90 + rng() * 80, 40 + rng() * 120);
+          ctx.lineWidth = 2.5 * scale; ctx.strokeStyle = col; ctx.stroke();
+        }
+        x += pw + 130 + rng() * 260;
+      }
+    };
+
+    const cavernLayer = (ctx, W, H, col, scale) => {
+      ctx.fillStyle = col;
+      // ceiling stalactites
+      ctx.beginPath(); ctx.moveTo(0, 0);
+      let x = 0;
+      while (x < W) {
+        const len = (40 + rng() * 150) * scale;
+        const wdt = 30 + rng() * 80;
+        ctx.lineTo(x + wdt / 2, len);
+        ctx.lineTo(x + wdt, 10 + rng() * 40);
+        x += wdt;
+      }
+      ctx.lineTo(W, 0); ctx.closePath(); ctx.fill();
+      // floor mounds
+      for (let i = 0; i < 14; i++) {
+        const mx = rng() * W, mw = 80 + rng() * 220, mh = 30 + rng() * 90;
+        ctx.beginPath();
+        ctx.ellipse(mx, H, mw, mh, 0, Math.PI, 0);
+        ctx.fill();
+      }
+    };
+
+    if (kind === 'forest') {
+      make(0.12, (c, W, H) => treeLayer(c, W, H, 'rgba(16,22,30,0.9)', H - 60, 0.7));
+      make(0.3,  (c, W, H) => treeLayer(c, W, H, 'rgba(10,14,20,0.95)', H - 40, 1.0));
+      make(0.55, (c, W, H) => treeLayer(c, W, H, 'rgba(5,8,12,1)', H - 14, 1.5));
+    } else if (kind === 'facility') {
+      make(0.1,  (c, W, H) => buildingLayer(c, W, H, 'rgba(17,23,32,0.9)', H - 70, 0.8, true));
+      make(0.3,  (c, W, H) => buildingLayer(c, W, H, 'rgba(10,14,20,0.95)', H - 40, 1.1, true));
+      make(0.55, (c, W, H) => treeLayer(c, W, H, 'rgba(5,8,12,1)', H - 10, 1.2));
+    } else if (kind === 'interior') {
+      make(0.15, (c, W, H) => pillarLayer(c, W, H, 'rgba(15,20,28,0.85)', 0.8));
+      make(0.4,  (c, W, H) => pillarLayer(c, W, H, 'rgba(8,12,17,0.95)', 1.2));
+    } else if (kind === 'cavern') {
+      make(0.15, (c, W, H) => cavernLayer(c, W, H, 'rgba(13,17,24,0.9)', 0.8));
+      make(0.4,  (c, W, H) => cavernLayer(c, W, H, 'rgba(7,10,15,0.97)', 1.3));
+    }
+  },
+
+  // --------------------------- frame ---------------------------
+  sky(ctx, pal, time) {
+    const g = ctx.createLinearGradient(0, 0, 0, VIEW_H);
+    g.addColorStop(0, pal.sky0);
+    g.addColorStop(1, pal.sky1);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    // distant glow on horizon (the place you are walking toward)
+    const gx = VIEW_W * 0.5, gy = VIEW_H * 0.62;
+    const rg = ctx.createRadialGradient(gx, gy, 10, gx, gy, 420);
+    rg.addColorStop(0, pal.horizonGlow || 'rgba(120,140,160,0.10)');
+    rg.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = rg;
+    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+  },
+
+  parallax(ctx, cam) {
+    for (const L of this.bgLayers) {
+      const W = L.canvas.width;
+      let ox = -((cam.x * L.factor) % W);
+      const oy = -60 - cam.y * L.factor * 0.3;
+      if (ox > 0) ox -= W;
+      for (let x = ox; x < VIEW_W; x += W) ctx.drawImage(L.canvas, x, oy);
+    }
+  },
+
+  fogBand(ctx, cam, time, color) {
+    ctx.save();
+    for (let i = 0; i < 3; i++) {
+      const y = VIEW_H * (0.55 + i * 0.16) + Math.sin(time * 0.1 + i * 2) * 12;
+      const x = ((time * (8 + i * 5) + i * 400 - cam.x * 0.2) % (VIEW_W + 800)) - 400;
+      const g = ctx.createRadialGradient(x, y, 0, x, y, 320);
+      g.addColorStop(0, color);
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    }
+    ctx.restore();
+  },
+
+  // ------------------------ world tiles ------------------------
+  tiles(ctx, level, cam, time) {
+    const tx0 = Math.max(0, Math.floor(cam.x / TILE) - 1);
+    const tx1 = Math.min(level.w - 1, Math.ceil((cam.x + VIEW_W) / TILE) + 1);
+    const ty0 = Math.max(0, Math.floor(cam.y / TILE) - 1);
+    const ty1 = Math.min(level.h - 1, Math.ceil((cam.y + VIEW_H) / TILE) + 1);
+
+    for (let ty = ty0; ty <= ty1; ty++) {
+      for (let tx = tx0; tx <= tx1; tx++) {
+        const c = tileAt(level, tx, ty);
+        const x = tx * TILE - cam.x, y = ty * TILE - cam.y;
+        if (c === '#') {
+          ctx.fillStyle = '#06080c';
+          ctx.fillRect(x, y, TILE + 1, TILE + 1);
+          if (!isSolidTile(tileAt(level, tx, ty - 1))) {
+            ctx.fillStyle = 'rgba(150,170,190,0.10)';
+            ctx.fillRect(x, y, TILE + 1, 3);
+          }
+        } else if (c === '-') {
+          ctx.fillStyle = '#0a0d13';
+          ctx.fillRect(x, y, TILE + 1, 7);
+          ctx.fillStyle = 'rgba(150,170,190,0.12)';
+          ctx.fillRect(x, y, TILE + 1, 2);
+        } else if (c === 'G') {
+          // grass tufts (deterministic per tile)
+          const r = makeRng(tx * 7919 + ty * 104729);
+          ctx.strokeStyle = 'rgba(8,11,16,0.95)';
+          ctx.lineWidth = 2;
+          for (let i = 0; i < 7; i++) {
+            const bx = x + 2 + r() * (TILE - 4);
+            const hgt = 12 + r() * 20;
+            const sway = Math.sin(time * 1.4 + bx * 0.12) * 3;
+            ctx.beginPath();
+            ctx.moveTo(bx, y + TILE);
+            ctx.quadraticCurveTo(bx + sway, y + TILE - hgt * 0.6, bx + sway * 1.8, y + TILE - hgt);
+            ctx.stroke();
+          }
+        }
+      }
+    }
+  },
+
+  water(ctx, level, cam, time) {
+    const tx0 = Math.max(0, Math.floor(cam.x / TILE) - 1);
+    const tx1 = Math.min(level.w - 1, Math.ceil((cam.x + VIEW_W) / TILE) + 1);
+    const ty0 = Math.max(0, Math.floor(cam.y / TILE) - 1);
+    const ty1 = Math.min(level.h - 1, Math.ceil((cam.y + VIEW_H) / TILE) + 1);
+    ctx.fillStyle = 'rgba(20,34,48,0.62)';
+    for (let ty = ty0; ty <= ty1; ty++)
+      for (let tx = tx0; tx <= tx1; tx++)
+        if (tileAt(level, tx, ty) === '~') {
+          const x = tx * TILE - cam.x, y = ty * TILE - cam.y;
+          ctx.fillRect(x, y, TILE + 1, TILE + 1);
+          if (tileAt(level, tx, ty - 1) !== '~') {
+            const wob = Math.sin(time * 2 + tx * 0.9) * 2;
+            ctx.fillStyle = 'rgba(160,190,210,0.18)';
+            ctx.fillRect(x, y + wob, TILE + 1, 2);
+            ctx.fillStyle = 'rgba(20,34,48,0.62)';
+          }
+        }
+  },
+
+  // ---------------------- humanoid figure ----------------------
+  humanoid(ctx, p, cam, opts) {
+    opts = opts || {};
+    const cx = p.x + p.w / 2 - cam.x;
+    const feet = p.y + p.h - cam.y;
+    const col = opts.color || '#0b0d11';
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = col;
+    ctx.fillStyle = col;
+
+    let hipY = feet - 19, headR = 5.6, lean = clamp(p.vx * 0.0011, -0.3, 0.3);
+    const ph = p.runPhase * Math.PI * 2;
+    let legA = { hx: 0, fy: feet, fx: cx }, legB = { fy: feet, fx: cx };
+
+    if (p.state === 'swim') {
+      hipY = feet - 12;
+      lean = p.facing * 0.9;
+    } else if (p.state === 'crouch') {
+      hipY = feet - 12;
+    } else if (p.state === 'run' || p.state === 'push') {
+      const stride = p.state === 'push' ? 6 : 11;
+      legA.fx = cx + Math.sin(ph) * stride * p.facing;
+      legA.fy = feet - Math.max(0, Math.sin(ph + Math.PI / 2)) * 7;
+      legB.fx = cx + Math.sin(ph + Math.PI) * stride * p.facing;
+      legB.fy = feet - Math.max(0, Math.sin(ph + Math.PI * 1.5)) * 7;
+      lean = p.facing * (p.state === 'push' ? 0.42 : 0.18);
+      hipY = feet - 18 + Math.abs(Math.sin(ph)) * 1.5;
+    } else if (p.state === 'jump' || p.state === 'fall') {
+      legA.fx = cx + 7 * p.facing; legA.fy = feet - 6;
+      legB.fx = cx - 5 * p.facing; legB.fy = feet - 1;
+      lean = p.facing * 0.12;
+    } else {
+      legA.fx = cx - 4; legB.fx = cx + 4;
+    }
+
+    const shY = hipY - 14 + (p.state === 'crouch' ? 5 : 0);
+    const shX = cx + Math.sin(lean) * 10;
+    const headX = shX + Math.sin(lean) * 6;
+    const headY = shY - 8 + (p.state === 'crouch' ? 2 : 0);
+
+    // legs (hip -> knee -> foot)
+    const drawLeg = (fx, fy) => {
+      const kx = (cx + fx) / 2 + p.facing * 3, ky = (hipY + fy) / 2 - 2;
+      ctx.lineWidth = 4.5;
+      ctx.beginPath(); ctx.moveTo(cx, hipY); ctx.lineTo(kx, ky); ctx.lineTo(fx, fy); ctx.stroke();
+    };
+    drawLeg(legA.fx, legA.fy);
+    drawLeg(legB.fx, legB.fy);
+
+    // torso
+    ctx.lineWidth = 7;
+    ctx.beginPath(); ctx.moveTo(cx, hipY); ctx.lineTo(shX, shY); ctx.stroke();
+
+    // arms
+    ctx.lineWidth = 3.6;
+    const armSwing = (p.state === 'run') ? Math.sin(ph + Math.PI) * 8 * p.facing : 2 * p.facing;
+    const reach = (p.state === 'push' || p.grabbing) ? 13 * p.facing : armSwing;
+    ctx.beginPath(); ctx.moveTo(shX, shY + 2);
+    ctx.lineTo(shX + reach, shY + 11);
+    ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(shX, shY + 2);
+    ctx.lineTo(shX - armSwing * 0.7, shY + 12);
+    ctx.stroke();
+
+    // head
+    ctx.beginPath(); ctx.arc(headX, headY, headR, 0, Math.PI * 2); ctx.fill();
+
+    // husk marker: tiny dim light on the head
+    if (opts.huskGlow) {
+      ctx.fillStyle = opts.connected ? 'rgba(190,210,255,0.9)' : 'rgba(120,140,170,0.4)';
+      ctx.beginPath(); ctx.arc(headX, headY - 3, 1.8, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  },
+
+  // ------------------------- post fx ---------------------------
+  vignette(ctx) {
+    const g = ctx.createRadialGradient(VIEW_W / 2, VIEW_H / 2, VIEW_H * 0.42, VIEW_W / 2, VIEW_H / 2, VIEW_H * 0.95);
+    g.addColorStop(0, 'rgba(0,0,0,0)');
+    g.addColorStop(1, 'rgba(0,0,0,0.55)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    // cinematic bars
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, VIEW_W, 26);
+    ctx.fillRect(0, VIEW_H - 26, VIEW_W, 26);
+  },
+
+  grainPass(ctx) {
+    ctx.save();
+    ctx.globalAlpha = 0.5;
+    const ox = Math.floor(Math.random() * 160), oy = Math.floor(Math.random() * 160);
+    for (let y = -oy; y < VIEW_H; y += 160)
+      for (let x = -ox; x < VIEW_W; x += 160)
+        ctx.drawImage(this.grain, x, y);
+    ctx.restore();
+  },
+
+  rainPass(ctx, dt, cam) {
+    ctx.strokeStyle = 'rgba(170,190,210,0.13)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (const r of this.rain) {
+      r.y += r.s * dt;
+      r.x -= r.s * 0.18 * dt + (cam.dx || 0);
+      if (r.y > VIEW_H) { r.y = -20; r.x = Math.random() * (VIEW_W + 100); }
+      if (r.x < -20) r.x += VIEW_W + 40;
+      ctx.moveTo(r.x, r.y);
+      ctx.lineTo(r.x + r.l * 0.18, r.y + r.l);
+    }
+    ctx.stroke();
+  },
+
+  motesPass(ctx, dt, time) {
+    ctx.fillStyle = 'rgba(180,200,220,0.07)';
+    for (const m of this.motes) {
+      m.x += m.vx * dt;
+      if (m.x > VIEW_W) m.x = -4;
+      const y = m.y + Math.sin(time * 0.5 + m.ph) * 14;
+      ctx.fillRect(m.x, y, 2, 2);
+    }
+  },
+
+  // darkness with light holes: holes = [{x,y,r,a}] in screen space
+  darkness(ctx, amount, holes) {
+    const dc = this.darkCanvas.getContext('2d');
+    dc.clearRect(0, 0, VIEW_W, VIEW_H);
+    dc.fillStyle = `rgba(2,3,5,${amount})`;
+    dc.fillRect(0, 0, VIEW_W, VIEW_H);
+    dc.globalCompositeOperation = 'destination-out';
+    for (const h of holes) {
+      const g = dc.createRadialGradient(h.x, h.y, h.r * 0.15, h.x, h.y, h.r);
+      g.addColorStop(0, `rgba(0,0,0,${h.a})`);
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      dc.fillStyle = g;
+      dc.fillRect(h.x - h.r, h.y - h.r, h.r * 2, h.r * 2);
+    }
+    dc.globalCompositeOperation = 'source-over';
+    ctx.drawImage(this.darkCanvas, 0, 0);
+  },
+};
