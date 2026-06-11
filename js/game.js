@@ -181,7 +181,10 @@ function drawPlay(dt) {
   Render.parallax(ctx, cam);
   Render.fogBand(ctx, cam, Game.time, 'rgba(120,140,160,0.045)');
   Render.tiles(ctx, Game.level, cam, Game.time);
-  // entity rendering (boxes/doors/levers/...) lands in T4
+  // remaining entity types (levers/lights/helms/lifts/...) land in T4
+  for (const pl of Game.world.plates) Render.plate(ctx, pl, cam);
+  for (const d of Game.world.doors) Render.door(ctx, d, cam);
+  for (const b of Game.world.boxes) Render.box(ctx, b, cam);
   Render.water(ctx, Game.level, cam, Game.time);
   for (const h of Game.world.husks) Render.humanoid(ctx, h, cam, { huskGlow: true });
   Render.humanoid(ctx, Game.player, cam, {});

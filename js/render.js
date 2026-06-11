@@ -258,6 +258,48 @@ const Render = {
         }
   },
 
+  // ------------------- interactive entities ---------------------
+  // Basic silhouettes so nothing collidable is invisible; T4 styles
+  // these properly (and adds levers, lights, helms, lifts, etc).
+  box(ctx, b, cam) {
+    const x = b.x - cam.x, y = b.y - cam.y;
+    ctx.fillStyle = '#080a0f';
+    ctx.fillRect(x, y, b.w, b.h);
+    ctx.fillStyle = 'rgba(150,170,190,0.14)';   // top catch-light, like tiles
+    ctx.fillRect(x, y, b.w, 2);
+    ctx.strokeStyle = 'rgba(150,170,190,0.07)'; // plank seams
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + 2.5, y + 2.5, b.w - 5, b.h - 5);
+    ctx.beginPath();
+    ctx.moveTo(x + 2, y + b.h / 2);
+    ctx.lineTo(x + b.w - 2, y + b.h / 2);
+    ctx.stroke();
+  },
+
+  door(ctx, d, cam) {
+    const hh = d.h * (1 - d.openT);          // matches the physics rect
+    const x = d.x - cam.x, y = d.y - cam.y;
+    // frame posts either side, full height
+    ctx.fillStyle = '#05070b';
+    ctx.fillRect(x - 4, y, 4, d.h);
+    ctx.fillRect(x + d.w, y, 4, d.h);
+    if (hh > 1) {
+      ctx.fillStyle = '#0a0d13';
+      ctx.fillRect(x, y, d.w, hh);
+      ctx.fillStyle = 'rgba(150,170,190,0.12)'; // leading (bottom) edge
+      ctx.fillRect(x, y + hh - 2, d.w, 2);
+    }
+  },
+
+  plate(ctx, p, cam) {
+    const sink = p.sink * 5;
+    const x = p.x - cam.x, y = p.y - cam.y + sink;
+    ctx.fillStyle = '#0a0d13';
+    ctx.fillRect(x + 2, y, p.w - 4, p.h - sink + 2);
+    ctx.fillStyle = p.pressed ? 'rgba(190,205,225,0.22)' : 'rgba(150,170,190,0.12)';
+    ctx.fillRect(x + 2, y, p.w - 4, 2);
+  },
+
   // ---------------------- humanoid figure ----------------------
   humanoid(ctx, p, cam, opts) {
     opts = opts || {};

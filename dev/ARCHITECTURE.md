@@ -130,9 +130,11 @@ oneways) → entity drawing (mostly TODO in game.js or added here) →
 Camera is `{x,y}` world px of the view's top-left (+ optional `dx` used by
 rain for parallax feel).
 
-**Still to draw (no helpers yet):** boxes, doors, levers, plates, light cones
-+ fixtures, helms, lift platforms + ropes, creature, checkpoints, exits,
-hint text. Add these as Render methods in the entity-render task.
+Basic silhouettes exist for `box(ctx,b,cam)`, `door(ctx,d,cam)`,
+`plate(ctx,p,cam)` (pulled forward from T4 after user feedback — nothing
+collidable may be invisible). **Still to draw:** levers, light cones +
+fixtures, helms, lift platforms + ropes, creature, checkpoints, exits,
+hint text; plus proper styling of box/door/plate in T4.
 
 ### game.js
 

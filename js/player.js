@@ -271,10 +271,12 @@ function updateHumanoid(p, ctl, dt, level, solids, sounds) {
   else p.state = 'idle';
   p.pushTimer = Math.max(0, p.pushTimer - dt);
 
-  if (p.state === 'run') {
-    p.runPhase += spd * dt * 0.055;
-    p.stepTimer -= dt;
-    if (p.stepTimer <= 0 && sounds) { AudioSys.step(); p.stepTimer = 0.34 - spd * 0.0006; }
+  if (p.state === 'run' || p.state === 'push') {
+    // ~1.9 stride cycles/s at full run; footsteps on each foot-plant
+    // (half cycle) so audio stays locked to the legs
+    const prevPlant = Math.floor(p.runPhase * 2);
+    p.runPhase += spd * dt * 0.009;
+    if (Math.floor(p.runPhase * 2) !== prevPlant && sounds) AudioSys.step();
   } else {
     p.runPhase = damp(p.runPhase, Math.round(p.runPhase), 10, dt);
   }

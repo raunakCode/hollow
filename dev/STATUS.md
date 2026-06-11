@@ -58,6 +58,16 @@ Written this session:
   drop-through input exists (by design so far).
 - Camera clamps correctly at level edges; look-ahead is damped.
 
+### User playtest feedback round 1 (2026-06-11) — addressed
+
+- "Legs spasm very fast": run stride was 11.8 cycles/s (runPhase factor
+  0.055). Now 0.009 ≈ 1.9 strides/s, push state animates too, and
+  footstep SFX fire on actual foot-plants (half stride) instead of a
+  separate timer.
+- "I'm pushing a box I can't see": box/door/plate silhouette rendering
+  pulled forward from T4 (Render.box/door/plate). Rule going forward:
+  **never ship an invisible collider**, even in test maps.
+
 ## Needs the user (T2 sign-off)
 
 Mechanics are machine-verified; these acceptance criteria need a human
