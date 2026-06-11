@@ -77,6 +77,13 @@ const sandbox = {
   },
   AudioContext: FakeAudioContext,
 };
+// localStorage stub (save/continue tests poke `storageData` directly)
+const storageData = {};
+sandbox.localStorage = {
+  getItem: k => (k in storageData ? storageData[k] : null),
+  setItem: (k, v) => { storageData[k] = String(v); },
+  removeItem: k => { delete storageData[k]; },
+};
 sandbox.window = sandbox;
 sandbox.globalThis = sandbox;
 vm.createContext(sandbox);
@@ -129,6 +136,15 @@ frames(150);                      // fade out, switch, fade in
 check('reached play', Game.state === 'play', Game.state);
 const start = { x: P().x, y: P().y };
 check('spawned on ground', P().grounded, at());
+
+console.log('-- R respawn (no checkpoint yet -> playerStart)');
+keyDown('ArrowRight'); frames(40); keyUp('ArrowRight');
+const beforeR = P().x;
+tap('KeyR');
+frames(40);
+check('dead state entered', Game.state === 'dead' || Game.state === 'play', Game.state);
+frames(200);
+check('respawned at start', Game.state === 'play' && Math.abs(P().x - (3 * TILE + 7)) < 2 && P().x < beforeR, at());
 
 console.log('-- run right');
 keyDown('ArrowRight');
@@ -373,13 +389,249 @@ for (let i = 0; i < 6 && !onPlateau; i++) {
 releaseAll();
 check('mantles from box onto 4-tile plateau', onPlateau, at());
 
-console.log('-- R respawn');
-const beforeR = P().x;
-tap('KeyR');
+// =================== T3 gauntlet (cols 75+) ===================
+// Continues from the plateau; do NOT press R before checkpoint 3 or
+// the whole left half has to be replayed.
+
+const W = () => Game.world;
+const sv = () => { try { return JSON.parse(storageData.hollow_save); } catch (e) { return null; } };
+// walk right (or left) until cond() or a frame budget runs out
+function walkUntil(dir, cond, maxFrames) {
+  const key = dir > 0 ? 'ArrowRight' : 'ArrowLeft';
+  keyDown(key);
+  let i = 0;
+  for (; i < maxFrames && !cond(); i++) frames(1);
+  keyUp(key);
+  return cond();
+}
+
+console.log('-- checkpoint 0 (col 77) + save');
+walkUntil(1, () => P().x > 78 * TILE, 600);   // off the plateau, through the lamp
+frames(10);
+check('checkpoint 0 latched', Game.checkpointIdx === 0, 'idx=' + Game.checkpointIdx);
+check('save written', sv() && sv().chapter === 0 && sv().checkpointIdx === 0, JSON.stringify(sv()));
+
+console.log('-- lever (80) toggles door (83)');
+const lever = () => W().levers[0];
+const lDoor = () => W().doors[1];
+walkUntil(1, () => Math.abs(P().x + P().w / 2 - 80.5 * TILE) < 10, 300);
+frames(5);
+tap('KeyX');
+frames(5);
+check('lever flips on', lever().on === true);
+let lOpened = false;
+for (let i = 0; i < 180 && !lOpened; i++) { frames(1); lOpened = lDoor().openT > 0.6; }
+check('lever door opens', lOpened, `openT=${lDoor().openT.toFixed(2)}`);
+tap('KeyX');
+const openTAtToggle = lDoor().openT;
 frames(40);
-check('dead state entered', Game.state === 'dead' || Game.state === 'play', Game.state);
-frames(180);                      // fade out + respawn + fade in
-check('respawned at start', Game.state === 'play' && Math.abs(P().x - (3 * TILE + 7)) < 2 && P().x < beforeR, at());
+check('lever flips back off and door closes', lever().on === false && lDoor().openT < openTAtToggle, `on=${lever().on} openT=${lDoor().openT.toFixed(2)} was=${openTAtToggle.toFixed(2)}`);
+tap('KeyX');                                   // open it again for the crossing
+let lReopened = false;
+for (let i = 0; i < 200 && !lReopened; i++) { frames(1); lReopened = lDoor().openT > 0.9; }
+check('door reopened', lReopened, `openT=${lDoor().openT.toFixed(2)}`);
+
+console.log('-- searchlight (93): standing in the beam kills');
+walkUntil(1, () => P().x + P().w / 2 > 90 * TILE + 16, 400);
+let litDead = false;
+for (let i = 0; i < 900 && !litDead; i++) { frames(1); litDead = Game.state === 'dead'; }
+check('light kills exposed player', litDead, `detect=${W().lights[0].detect.toFixed(2)} ` + at());
+frames(220);                                   // respawn
+check('respawned at checkpoint 0', Game.state === 'play' && Math.abs(P().x - (77 * TILE + 7)) < 2, at());
+check('death reset the lever', lever().on === false, 'on=' + lever().on);
+
+console.log('-- searchlight: grass + timing crossing');
+tap('KeyX', 3);                                // wrong spot: must do nothing
+check('act away from lever is inert', lever().on === false);
+walkUntil(1, () => Math.abs(P().x + P().w / 2 - 80.5 * TILE) < 10, 300);
+tap('KeyX');
+for (let i = 0; i < 200 && lDoor().openT < 0.9; i++) frames(1);
+walkUntil(1, () => P().x + P().w / 2 > 87 * TILE, 300);
+const ang = () => W().lights[0].ang;
+for (let i = 0; i < 600 && ang() > 1.15; i++) frames(1);   // beam far right
+walkUntil(1, () => P().x + P().w / 2 > 93.5 * TILE, 200);  // into the grass
+keyDown('ArrowDown');                                       // hide
+for (let i = 0; i < 600 && ang() < 1.95; i++) frames(1);   // beam far left
+keyUp('ArrowDown');
+walkUntil(1, () => P().x > 99 * TILE + 20, 300);           // dash out the far side
+frames(10);
+check('crossed the light alive', Game.state === 'play' && P().x > 99 * TILE, at());
+check('checkpoint 1 latched', Game.checkpointIdx === 1, 'idx=' + Game.checkpointIdx);
+
+console.log('-- helm (103): husk mirrors input, camera follows husks');
+const husk = () => W().husks[0];
+const hDoor = () => W().doors[2];
+const plate2 = () => W().plates[1];
+walkUntil(1, () => Math.abs(P().x + P().w / 2 - 103.5 * TILE) < 8, 400);
+frames(5);
+tap('KeyX');
+frames(5);
+check('connected to helm', !!Game.helmed);
+const pXBefore = P().x, huskXBefore = husk().x;
+keyDown('ArrowRight');
+frames(20);                                     // short hop: plate is close
+keyUp('ArrowRight');
+check('husk walks right', husk().x > huskXBefore + 50, `husk ${huskXBefore.toFixed(0)} -> ${husk().x.toFixed(0)}`);
+check('player stays slumped', Math.abs(P().x - pXBefore) < 2, at());
+let camOnHusk = false;
+for (let i = 0; i < 240 && !camOnHusk; i++) { frames(1); camOnHusk = Game.cam.x > 3000; }
+check('camera drifts to husk', camOnHusk, `cam.x=${Game.cam.x.toFixed(0)}`);
+// walk the husk onto the plate (113-114), a body's width past the edge
+keyDown('ArrowRight');
+let onPlate = false;
+for (let i = 0; i < 400 && !onPlate; i++) { frames(1); onPlate = plate2().pressed; }
+frames(8);
+keyUp('ArrowRight');
+frames(20);                                     // settle on the plate
+check('husk presses the plate', onPlate && plate2().pressed, `husk x=${husk().x.toFixed(0)}`);
+let hOpened = false;
+for (let i = 0; i < 200 && !hOpened; i++) { frames(1); hOpened = hDoor().openT > 0.6; }
+check('husk door opens', hOpened, `openT=${hDoor().openT.toFixed(2)}`);
+tap('KeyX');                                   // disconnect
+frames(40);
+check('disconnected, husk holds the plate', !Game.helmed && plate2().pressed === true);
+
+console.log('-- through the husk door to checkpoint 2 (117)');
+walkUntil(1, () => P().x > 117 * TILE + 20, 600);
+frames(10);
+check('checkpoint 2 latched', Game.checkpointIdx === 2, 'idx=' + Game.checkpointIdx + ' ' + at());
+
+console.log('-- counterweight lift: box sinks A, husk joins, ride B up');
+const lift = () => W().lifts[0];
+const liftBox = () => W().boxes[3];
+// push the box (121) into pit A (124-125); stop at the brink
+keyDown('ArrowRight');
+for (let i = 0; i < 500 && liftBox().x < 124 * TILE + 2; i++) frames(1);
+keyUp('ArrowRight');
+frames(120);                                    // box falls in, platform sinks
+check('box rides platform A down', liftBox().y > 660, `box y=${liftBox().y.toFixed(0)} off=${lift().off.toFixed(1)}`);
+check('lift state: A sunk, B risen', lift().off < -60, `off=${lift().off.toFixed(1)}`);
+// fetch the husk as extra counterweight: back to the helm
+walkUntil(-1, () => Math.abs(P().x + P().w / 2 - 103.5 * TILE) < 8, 700);
+frames(5);
+tap('KeyX');
+frames(5);
+keyDown('ArrowRight');                          // drive husk toward the pit
+let huskInPit = false;
+for (let i = 0; i < 700 && !huskInPit; i++) {
+  frames(1);
+  // on platform A = feet at the sunken platform, anywhere over its span
+  huskInPit = husk().x + husk().w > 124 * TILE + 4 && husk().y + husk().h > 21 * TILE + 28;
+}
+keyUp('ArrowRight');
+frames(20);
+check('husk rides into pit A (platform weight 2)', huskInPit,
+  `husk=${husk().x.toFixed(0)},${(husk().y + husk().h).toFixed(0)}`);
+tap('KeyX');                                    // disconnect
+frames(30);
+const feet = () => P().y + P().h;
+// hop pit A onto the strip (126-127); a short fall onto the box below
+// self-recovers because the same right+jump mantles back out
+const onStripNow = () => P().grounded && P().x > 126 * TILE - 2 &&
+  P().x + P().w < 128 * TILE + 6 && Math.abs(feet() - 20 * TILE) < 3;
+walkUntil(1, () => P().x + P().w > 123.8 * TILE, 400);
+let onStrip = false;
+for (let i = 0; i < 10 && !onStrip; i++) {
+  const inPitB = feet() > 20 * TILE + 20 && P().x > 128 * TILE - 6;
+  const dirKey = inPitB ? 'ArrowLeft' : 'ArrowRight';
+  keyDown(dirKey); keyDown('Space');
+  frames(14);
+  keyUp('Space');
+  for (let j = 0; j < 70 && !onStrip; j++) { frames(1); onStrip = onStripNow(); }
+  keyUp(dirKey); frames(8);
+}
+check('on the strip between the pits', onStrip, at());
+// board the widened platform B (128-130, risen to row 18). It's a lift
+// solid, not a tile wall, so you can't mantle onto it — a running jump
+// from the strip has to land on top.
+const onBNow = () => P().grounded && P().x + P().w / 2 > 128 * TILE &&
+  P().x < 131 * TILE && feet() < 19 * TILE;
+let onB = false;
+for (let attempt = 0; attempt < 14 && !onB; attempt++) {
+  walkUntil(-1, () => P().x < 126 * TILE + 6, 120);   // back to the strip's left edge
+  releaseAll();
+  keyDown('ArrowRight');
+  frames(7);                                          // short runway across the strip
+  keyDown('Space');
+  frames(15);
+  keyUp('Space');
+  for (let j = 0; j < 55 && !onB; j++) { frames(1); onB = onBNow(); }
+  keyUp('ArrowRight');
+  frames(8);
+  if (!onB && feet() > 20 * TILE + 12) {              // fell into pit B: mantle back up to the strip
+    for (let j = 0; j < 200 && feet() > 20 * TILE; j++) {
+      keyDown('ArrowLeft');
+      if (j % 24 < 12) keyDown('Space'); else keyUp('Space');
+      frames(1);
+    }
+    releaseAll();
+    frames(10);
+  }
+}
+check('standing on risen platform B', onB, at() + ` off=${lift().off.toFixed(1)}`);
+// from B, mantle up to the ledge (col 131, top row 16) — a 2-tile climb
+let onLedge = false;
+for (let i = 0; i < 8 && !onLedge; i++) {
+  keyDown('ArrowRight'); keyDown('Space');
+  frames(15);
+  keyUp('Space');
+  for (let j = 0; j < 80 && !onLedge; j++) {
+    frames(1);
+    onLedge = P().grounded && P().x >= 131 * TILE - 4 && P().y + P().h <= 16 * TILE + 1;
+  }
+  keyUp('ArrowRight'); frames(6);
+}
+releaseAll();
+check('reached the ledge via the lift', onLedge, at());
+
+console.log('-- checkpoint 3 (132), then the Listener kills a runner');
+walkUntil(1, () => P().x > 133 * TILE, 300);
+frames(10);
+check('checkpoint 3 latched', Game.checkpointIdx === 3, 'idx=' + Game.checkpointIdx);
+const cre = () => W().creatures[0];
+// move into its range and keep moving there. When its eye next opens
+// (alert) a noisy, nearby player is charged. Don't sprint past to the
+// exit — jitter in place left of it so the charge is deterministic.
+walkUntil(1, () => P().x > 137 * TILE, 200);
+let charged = false, killed = false;
+for (let i = 0; i < 2000 && !killed; i++) {
+  const goRight = (i % 30) < 15 && P().x < 139 * TILE;   // stay noisy, stay left of the exit
+  if (goRight) { keyDown('ArrowRight'); keyUp('ArrowLeft'); }
+  else { keyDown('ArrowLeft'); keyUp('ArrowRight'); }
+  frames(1);
+  if (cre().state === 'charge') charged = true;
+  killed = Game.state === 'dead';
+}
+releaseAll();
+check('running triggers a charge', charged, 'state=' + cre().state);
+check('charge kills on contact', killed, at());
+frames(220);
+check('respawned at checkpoint 3', Game.state === 'play' && Math.abs(P().x - (132 * TILE + 7)) < 2, at());
+check('death reset the world (box, husk, lift)',
+  Math.abs(liftBox().x - (121 * TILE + 1)) < 2 && Math.abs(husk().x - (110 * TILE + 7)) < 2 && lift().off === 0,
+  `box=${liftBox().x.toFixed(0)} husk=${husk().x.toFixed(0)} off=${lift().off.toFixed(1)}`);
+
+console.log('-- Listener: burst-walk while dormant, freeze on the growl');
+let reachedExit = false;
+for (let i = 0; i < 4000 && !reachedExit; i++) {
+  const still = cre().state !== 'dormant' || cre().eye > 0.25;
+  if (still) keyUp('ArrowRight');
+  else keyDown('ArrowRight');
+  frames(1);
+  reachedExit = Game.fadeV > 0;                 // exit zone touched
+}
+releaseAll();
+check('snuck past the Listener to the exit', reachedExit, at() + ' creature=' + cre().state);
+frames(200);                                    // fade through the exit
+check('single-chapter loop returns to title', Game.state === 'title', Game.state);
+check('finishing clears the save', sv() === null, JSON.stringify(sv()));
+
+console.log('-- continue from save');
+storageData.hollow_save = JSON.stringify({ chapter: 0, checkpointIdx: 1 });
+frames(30);
+tap('Space');
+frames(180);
+check('continues at saved checkpoint', Game.state === 'play' && Math.abs(P().x - (99 * TILE + 7)) < 2 && Game.checkpointIdx === 1, at() + ' idx=' + Game.checkpointIdx);
 
 console.log('-- camera');
 check('camera clamped', Game.cam.x >= 0 && Game.cam.y >= 0 &&

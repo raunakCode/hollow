@@ -142,11 +142,11 @@ const Render = {
     if (kind === 'forest') {
       make(0.12, (c, W, H) => treeLayer(c, W, H, 'rgba(16,22,30,0.9)', H - 60, 0.7));
       make(0.3,  (c, W, H) => treeLayer(c, W, H, 'rgba(10,14,20,0.95)', H - 40, 1.0));
-      make(0.55, (c, W, H) => treeLayer(c, W, H, 'rgba(5,8,12,1)', H - 14, 1.5));
+      make(0.55, (c, W, H) => treeLayer(c, W, H, 'rgba(8,12,18,1)', H - 14, 1.5));
     } else if (kind === 'facility') {
       make(0.1,  (c, W, H) => buildingLayer(c, W, H, 'rgba(17,23,32,0.9)', H - 70, 0.8, true));
       make(0.3,  (c, W, H) => buildingLayer(c, W, H, 'rgba(10,14,20,0.95)', H - 40, 1.1, true));
-      make(0.55, (c, W, H) => treeLayer(c, W, H, 'rgba(5,8,12,1)', H - 10, 1.2));
+      make(0.55, (c, W, H) => treeLayer(c, W, H, 'rgba(8,12,18,1)', H - 10, 1.2));
     } else if (kind === 'interior') {
       make(0.15, (c, W, H) => pillarLayer(c, W, H, 'rgba(15,20,28,0.85)', 0.8));
       make(0.4,  (c, W, H) => pillarLayer(c, W, H, 'rgba(8,12,17,0.95)', 1.2));
@@ -300,6 +300,144 @@ const Render = {
     ctx.fillRect(x + 2, y, p.w - 4, 2);
   },
 
+  lever(ctx, l, cam) {
+    const bx = l.x + l.w / 2 - cam.x, by = l.y + l.h - cam.y;
+    ctx.fillStyle = '#080a0f';
+    ctx.fillRect(bx - 7, by - 6, 14, 6);             // base
+    const ang = l.on ? 0.6 : -0.6;                   // stick leans by state
+    ctx.strokeStyle = '#0a0d13';
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(bx, by - 5);
+    ctx.lineTo(bx + Math.sin(ang) * 20, by - 5 - Math.cos(ang) * 20);
+    ctx.stroke();
+    ctx.fillStyle = l.on ? 'rgba(190,205,225,0.5)' : 'rgba(150,170,190,0.18)';
+    ctx.beginPath();
+    ctx.arc(bx + Math.sin(ang) * 20, by - 5 - Math.cos(ang) * 20, 3, 0, Math.PI * 2);
+    ctx.fill();
+  },
+
+  lightCone(ctx, Lt, cam) {
+    const x = Lt.x - cam.x, y = Lt.y - cam.y;
+    // fixture
+    ctx.fillStyle = '#05070b';
+    ctx.beginPath(); ctx.arc(x, y, 7, 0, Math.PI * 2); ctx.fill();
+    // beam: soft gradient wedge, brightens as detection fills
+    const a = 0.10 + Lt.detect * 0.22;
+    const g = ctx.createRadialGradient(x, y, 10, x, y, Lt.len);
+    g.addColorStop(0, `rgba(200,215,235,${(a * 1.4).toFixed(3)})`);
+    g.addColorStop(0.7, `rgba(190,205,230,${a.toFixed(3)})`);
+    g.addColorStop(1, 'rgba(190,205,230,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.arc(x, y, Lt.len, Lt.ang - Lt.fov / 2, Lt.ang + Lt.fov / 2);
+    ctx.closePath();
+    ctx.fill();
+  },
+
+  helm(ctx, h, cam, time) {
+    const cx = h.x + h.w / 2 - cam.x, top = h.y - cam.y;
+    // cable from above
+    ctx.strokeStyle = '#05070b';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, top - 200);
+    ctx.lineTo(cx, top + 14);
+    ctx.stroke();
+    // the helmet: a small dark dome at head height
+    ctx.fillStyle = '#080a0f';
+    ctx.beginPath(); ctx.arc(cx, top + 20, 8, Math.PI, 0); ctx.fill();
+    ctx.fillRect(cx - 8, top + 20, 16, 4);
+    // faint glow, stronger while connected (h.glow driven by game.js)
+    const a = 0.10 + h.glow * 0.30 + Math.sin(time * 2.1) * 0.03;
+    const g = ctx.createRadialGradient(cx, top + 20, 1, cx, top + 20, 26);
+    g.addColorStop(0, `rgba(190,210,255,${a.toFixed(3)})`);
+    g.addColorStop(1, 'rgba(190,210,255,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(cx - 26, top - 6, 52, 52);
+  },
+
+  lift(ctx, L, cam) {
+    const r = liftRects(L);
+    const beamY = Math.min(L.ay, L.by) - L.travel - 26 - cam.y;
+    // overhead beam spanning both rope pairs
+    ctx.fillStyle = '#05070b';
+    const bx0 = Math.min(r.a.x, r.b.x) - 6 - cam.x;
+    const bx1 = Math.max(r.a.x + r.a.w, r.b.x + r.b.w) + 6 - cam.x;
+    ctx.fillRect(bx0, beamY - 5, bx1 - bx0, 5);
+    ctx.strokeStyle = 'rgba(150,170,190,0.16)';
+    ctx.lineWidth = 2;
+    for (const pf of [r.a, r.b]) {
+      const x = pf.x - cam.x, y = pf.y - cam.y;
+      ctx.beginPath();
+      ctx.moveTo(x + 4, y); ctx.lineTo(x + 4, beamY);
+      ctx.moveTo(x + pf.w - 4, y); ctx.lineTo(x + pf.w - 4, beamY);
+      ctx.stroke();
+      // platform slab
+      ctx.fillStyle = '#0a0d13';
+      ctx.fillRect(x, y, pf.w, pf.h);
+      ctx.fillStyle = 'rgba(150,170,190,0.14)';
+      ctx.fillRect(x, y, pf.w, 2);
+    }
+  },
+
+  creature(ctx, c, cam, time) {
+    const x = c.x - cam.x, y = c.y - cam.y;
+    const breathe = Math.sin(time * 1.1) * 2;
+    ctx.fillStyle = '#05070b';
+    ctx.beginPath();
+    ctx.ellipse(x + c.w / 2, y + c.h * 0.62 + breathe * 0.3, c.w / 2, c.h * 0.55 - breathe * 0.2, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // hunched shoulder mass
+    ctx.beginPath();
+    ctx.ellipse(x + c.w * 0.38, y + c.h * 0.3 + breathe * 0.5, c.w * 0.3, c.h * 0.34, -0.25, 0, Math.PI * 2);
+    ctx.fill();
+    // the eye: opens with c.eye
+    if (c.eye > 0.03) {
+      const ex = x + c.w * 0.30, ey = y + c.h * 0.26 + breathe * 0.5;
+      const g = ctx.createRadialGradient(ex, ey, 0.5, ex, ey, 16);
+      g.addColorStop(0, `rgba(225,235,255,${(0.75 * c.eye).toFixed(3)})`);
+      g.addColorStop(0.25, `rgba(180,200,235,${(0.4 * c.eye).toFixed(3)})`);
+      g.addColorStop(1, 'rgba(180,200,235,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(ex - 16, ey - 16, 32, 32);
+      ctx.fillStyle = `rgba(230,240,255,${(0.85 * c.eye).toFixed(3)})`;
+      ctx.beginPath();
+      ctx.ellipse(ex, ey, 3.4, 3.4 * c.eye, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  },
+
+  check(ctx, c, cam, time) {
+    const cx = c.x + c.w / 2 - cam.x, by = c.y + c.h - cam.y;
+    ctx.strokeStyle = '#080a0f';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(cx, by);
+    ctx.lineTo(cx, by - 40);
+    ctx.stroke();
+    ctx.fillStyle = '#080a0f';
+    ctx.fillRect(cx - 5, by - 46, 10, 8);
+    const a = (c.done ? 0.30 : 0.12) + Math.sin(time * 1.3) * 0.03;
+    const g = ctx.createRadialGradient(cx, by - 42, 1, cx, by - 42, 30);
+    g.addColorStop(0, `rgba(215,225,240,${a.toFixed(3)})`);
+    g.addColorStop(1, 'rgba(215,225,240,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(cx - 30, by - 72, 60, 60);
+  },
+
+  exitGlow(ctx, e, cam, time) {
+    const x = e.x - cam.x, y = e.y - cam.y;
+    const pulse = 0.16 + Math.sin(time * 0.8) * 0.03;
+    const g = ctx.createLinearGradient(x, y, x, y + e.h);
+    g.addColorStop(0, `rgba(210,220,235,${(pulse * 0.4).toFixed(3)})`);
+    g.addColorStop(1, `rgba(210,220,235,${pulse.toFixed(3)})`);
+    ctx.fillStyle = g;
+    ctx.fillRect(x, y, e.w, e.h);
+  },
+
   // ---------------------- humanoid figure ----------------------
   humanoid(ctx, p, cam, opts) {
     opts = opts || {};
@@ -341,32 +479,41 @@ const Render = {
     const headX = shX + Math.sin(lean) * 6;
     const headY = shY - 8 + (p.state === 'crouch' ? 2 : 0);
 
-    // legs (hip -> knee -> foot)
-    const drawLeg = (fx, fy) => {
-      const kx = (cx + fx) / 2 + p.facing * 3, ky = (hipY + fy) / 2 - 2;
-      ctx.lineWidth = 4.5;
-      ctx.beginPath(); ctx.moveTo(cx, hipY); ctx.lineTo(kx, ky); ctx.lineTo(fx, fy); ctx.stroke();
-    };
-    drawLeg(legA.fx, legA.fy);
-    drawLeg(legB.fx, legB.fy);
-
-    // torso
-    ctx.lineWidth = 7;
-    ctx.beginPath(); ctx.moveTo(cx, hipY); ctx.lineTo(shX, shY); ctx.stroke();
-
-    // arms
-    ctx.lineWidth = 3.6;
     const armSwing = (p.state === 'run') ? Math.sin(ph + Math.PI) * 8 * p.facing : 2 * p.facing;
     const reach = (p.state === 'push' || p.grabbing) ? 13 * p.facing : armSwing;
-    ctx.beginPath(); ctx.moveTo(shX, shY + 2);
-    ctx.lineTo(shX + reach, shY + 11);
-    ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(shX, shY + 2);
-    ctx.lineTo(shX - armSwing * 0.7, shY + 12);
-    ctx.stroke();
 
-    // head
-    ctx.beginPath(); ctx.arc(headX, headY, headR, 0, Math.PI * 2); ctx.fill();
+    const drawFigure = (widen) => {
+      // legs (hip -> knee -> foot)
+      const drawLeg = (fx, fy) => {
+        const kx = (cx + fx) / 2 + p.facing * 3, ky = (hipY + fy) / 2 - 2;
+        ctx.lineWidth = 4.5 + widen;
+        ctx.beginPath(); ctx.moveTo(cx, hipY); ctx.lineTo(kx, ky); ctx.lineTo(fx, fy); ctx.stroke();
+      };
+      drawLeg(legA.fx, legA.fy);
+      drawLeg(legB.fx, legB.fy);
+
+      // torso
+      ctx.lineWidth = 7 + widen;
+      ctx.beginPath(); ctx.moveTo(cx, hipY); ctx.lineTo(shX, shY); ctx.stroke();
+
+      // arms
+      ctx.lineWidth = 3.6 + widen;
+      ctx.beginPath(); ctx.moveTo(shX, shY + 2);
+      ctx.lineTo(shX + reach, shY + 11);
+      ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(shX, shY + 2);
+      ctx.lineTo(shX - armSwing * 0.7, shY + 12);
+      ctx.stroke();
+
+      // head
+      ctx.beginPath(); ctx.arc(headX, headY, headR + widen / 2, 0, Math.PI * 2); ctx.fill();
+    };
+
+    // faint rim so the figure separates from same-value backgrounds
+    ctx.strokeStyle = ctx.fillStyle = opts.rim || 'rgba(130,150,175,0.20)';
+    drawFigure(2.6);
+    ctx.strokeStyle = ctx.fillStyle = col;
+    drawFigure(0);
 
     // husk marker: tiny dim light on the head
     if (opts.huskGlow) {

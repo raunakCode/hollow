@@ -1,6 +1,66 @@
 # HOLLOW — status
 
-_Last updated: 2026-06-11 (session 2)._
+_Last updated: 2026-06-11 (session 3)._
+
+## Session 3 — T3 systems + most of T4 rendering, all green
+
+Session 2 (fable) built the entire T3 interactive layer **and** pulled
+most of T4's entity rendering forward, but ran out of tokens mid-debug
+with the headless suite red, so none of it was documented or committed.
+Session 3 (this one) got the suite fully green and verified it.
+
+**Built across sessions 2–3 (uncommitted until now):**
+- **T3 wiring** in `game.js`: levers→doors, plates→doors/latched,
+  searchlight sweep + detection→death, helm connect/disconnect routing
+  input to husks (camera on husk centroid), counterweight lifts,
+  creature (the Listener) charge + death, checkpoints, death→checkpoint
+  reset of chapter state, save to localStorage + continue-from-title.
+- **T4 rendering (pulled forward)** in `render.js`: lever, light cone
+  (brightens on detection), helm (cable + glow), lift (ropes + slabs),
+  creature (body + eye that opens/closes), checkpoint lamp, exit glow,
+  plus a faint **player rim-light** so the figure separates from
+  same-value backgrounds (round-2 feedback #2).
+- **Audio (round-2 feedback #1, #3)**: real water `splash()` (down-
+  sweeping bandpass burst + lowpassed bubbly tail + blips) replacing the
+  thud; ambient wind bandpass Q raised so the bed reads as gusts not
+  broadband hiss; test-map mood wind/rain already lowered (0.016/0.006).
+
+**Session 3 fixes that turned the suite green (12 fails → 0):**
+- **Counterweight lift was unscriptable, not buggy.** The lift mechanic
+  itself was correct (platform B fully rises, husk-carry + weight sums
+  verified). The blocker was boarding a 2-tile-wide platform risen 2
+  tiles — brutal for a blind script (and fiddly by hand). Widened pit B
+  to 3 tiles (freed col 130, ledge now starts at 131) and gave the lift
+  **independent A/B platform widths** (`aw`/`bw`, was a single `w`) so
+  platform B is a 96px landing while A stays 64px over the narrow pit.
+  Note: you can't *mantle* onto a lift platform — mantle only triggers
+  on tile walls (`player.js` line ~241) — so boarding B is a real jump;
+  mantling from B up to the tile ledge (col 131) is reliable.
+- **The Listener charge test never ran before** (suite always died at
+  the lift). It charges only in `alert` state when the player is
+  near+noisy; the old test sprinted the player *past* it to the exit
+  before its eye-cycle reached alert, so it never fired and the chapter
+  just completed. Test now keeps the player jittering in range until the
+  charge lands. **Watch for T12:** a fast runner *can* currently sprint
+  the whole Listener corridor within one eye-shut window (the creature
+  body isn't lethal on contact, only its charge is) — the real chapter
+  needs corridor geometry long enough that no single window clears it.
+- **Floating box bobbed forever.** Buoyancy was a constant up-accel that
+  overshot and limit-cycled (vy swinging to ±85). Replaced with a damped
+  spring toward the surface using a new `waterSurfaceY(level, x)` helper
+  (`player.js`); the box now settles riding ~8px proud and is calm to
+  stand on.
+
+**Verification:** `node dev/headless.js` → 65/65 ALL PASS (deterministic
+across runs); `node dev/fuzz.js` → 8 seeds clean (no stuck/embed);
+`node dev/browser-test.js` → boots from file://, audio running, 122 fps
+uncapped, zero console errors; lift area screenshotted and reads cleanly.
+
+**Still needs the user (T3/T4 hand sign-off):** play the test map and
+confirm each mechanic *feels* right and reads on a real display — lever,
+searchlight tension, helm/husk control, the lift puzzle, the Listener
+freeze-when-eye-opens, and the audio balance (splash/ambient especially,
+nobody has *heard* the new splash). Machine-verified ≠ feel-verified.
 
 ## Where things stand
 
@@ -84,6 +144,35 @@ reports it again now that everything renders, get the exact spot —
 known remaining soft spots: box gliding into a player pinned against a
 wall can cause a sideways snap-out jolt (boxes don't collide with the
 player by design).
+
+### User playtest feedback round 2 (2026-06-11) — addressed (needs ear/eye sign-off)
+
+All three were implemented in session 2 (splash synth, ambient Q, mood
+wind/rain, player rim-light + lighter tree layers). They still need the
+user to confirm by ear/eye — especially the new splash, which no one has
+heard yet. Original notes:
+
+1. **Ambient white-noise bed too loud.** The wind/rain noise layers in
+   `audio.js _buildAmbient` / the test map's mood (`wind 0.05, rain
+   0.04`) read as loud hiss. Lower the noise gains (mood values and/or
+   the filter curves) so the bed sits well under everything; user
+   should barely notice it until it's gone.
+2. **Player silhouette gets lost against background trees.** Player
+   color `#0b0d11` is nearly identical to the nearest parallax layer
+   (`rgba(5,8,12,1)`) and tiles. Separate them: lighten/desaturate the
+   near bg layers slightly, and/or give the player a faint rim-light or
+   marginally lighter fill so the figure always reads. Verify with
+   zoomed screenshots against the tree layer specifically (player at
+   x≈300-600 in the test map).
+3. **Splash sounds like a thud, not water.** `AudioSys.splash()` is
+   `_thud(0.5, 0.35, 1400)` — a filtered noise burst that reads as a
+   hit. Build a real splash: e.g. noise through a bandpass/highpass
+   sweeping downward with a softer attack and a longer bubbly decay
+   (try layering a short bright burst + lowpassed tail, or modulate
+   filter freq 2000→400 over ~0.6s). Judge by ear via the user.
+
+These are quality fixes (T2 feel/audio sign-off territory), so T2 stays
+open until the user confirms all three plus general audio balance.
 
 ## Needs the user (T2 sign-off)
 

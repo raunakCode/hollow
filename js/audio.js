@@ -49,7 +49,8 @@ const AudioSys = {
     // Wind: filtered noise, slowly modulated
     const noise = ctx.createBufferSource();
     noise.buffer = this._noiseBuffer(4); noise.loop = true;
-    const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 500; bp.Q.value = 0.6;
+    // Q kept high enough that this reads as wind gusts, not broadband hiss
+    const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 420; bp.Q.value = 1.5;
     const windGain = ctx.createGain(); windGain.gain.value = 0;
     const wLfo = ctx.createOscillator(); wLfo.frequency.value = 0.11;
     const wLfoGain = ctx.createGain(); wLfoGain.gain.value = 250;
@@ -109,7 +110,39 @@ const AudioSys = {
   step()      { this._thud(0.07, 0.10, 700); },
   jump()      { this._thud(0.12, 0.12, 500); },
   land()      { this._thud(0.16, 0.22, 320); },
-  splash()    { this._thud(0.5, 0.35, 1400); },
+
+  splash() {
+    if (!this.ctx) return;
+    const ctx = this.ctx, t = ctx.currentTime;
+    // Bright break: noise through a bandpass sweeping down, soft attack
+    const burst = ctx.createBufferSource();
+    burst.buffer = this._noiseBuffer(0.7);
+    const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 1.0;
+    bp.frequency.setValueAtTime(2000, t);
+    bp.frequency.exponentialRampToValueAtTime(400, t + 0.6);
+    const bg = ctx.createGain();
+    bg.gain.setValueAtTime(0.0001, t);
+    bg.gain.linearRampToValueAtTime(0.28, t + 0.035);
+    bg.gain.exponentialRampToValueAtTime(0.0001, t + 0.65);
+    burst.connect(bp); bp.connect(bg); bg.connect(this.master);
+    burst.start(t);
+    // Bubbly tail: lowpassed noise, slower swell and decay
+    const tail = ctx.createBufferSource();
+    tail.buffer = this._noiseBuffer(0.9);
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(900, t);
+    lp.frequency.exponentialRampToValueAtTime(220, t + 0.8);
+    const tg = ctx.createGain();
+    tg.gain.setValueAtTime(0.0001, t);
+    tg.gain.linearRampToValueAtTime(0.13, t + 0.09);
+    tg.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
+    tail.connect(lp); lp.connect(tg); tg.connect(this.master);
+    tail.start(t);
+    // A couple of quick rising blips read as bubbles
+    this._blip(300 + Math.random() * 120, 0.12, 'sine', 0.035, 700);
+    this._blip(220 + Math.random() * 80, 0.16, 'sine', 0.03, 500);
+  },
+
   boxDrag()   { this._thud(0.09, 0.07, 220); },
   lever()     { this._blip(160, 0.25, 'square', 0.12, 70); this._thud(0.2, 0.2, 250); },
   doorMove()  { this._thud(0.7, 0.18, 140); },

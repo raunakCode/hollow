@@ -80,3 +80,4 @@ death-reset rule, set palette/mood/bg, playtest start-to-finish twice.
 - 2026-06-10 — engine scaffold (util/audio/player/entities/render) + docs — untested.
 - 2026-06-11 — T1 done: game.js + test map + node/browser smoke tests (dev/headless.js, dev/browser-test.js) — all green, 0 console errors.
 - 2026-06-11 — T2 mechanics: push/grab-pull, mantle climb cap (4-tile walls now box-only), rider-eject fix, T2 gauntlet in test map — 30 assertions green; T2 left unchecked pending human feel/audio pass (see STATUS).
+- 2026-06-11 — T3 systems (levers/doors/lights/helm-husks/lifts/Listener/save) + most of T4 entity rendering + round-2 audio/visual fixes (sessions 2–3). Session 3 fixed the lift geometry (independent aw/bw widths, widened pit B), the Listener charge test, and box buoyancy (spring-to-surface) — headless 65/65, fuzz 8-seed clean, browser clean. T3/T4 left unchecked pending human feel/audio sign-off (see STATUS).

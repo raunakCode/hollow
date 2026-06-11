@@ -51,7 +51,8 @@ function spawnEntities(defs) {
       case 'lift':
         w.lifts.push({
           ax: d.ax * TILE, ay: d.ay * TILE, bx: d.bx * TILE, by: d.by * TILE,
-          w: (d.w || 2) * TILE, travel: (d.travel || 3) * TILE,
+          aw: (d.aw || d.w || 2) * TILE, bw: (d.bw || d.w || 2) * TILE,
+          travel: (d.travel || 3) * TILE,
           off: (d.off || 0) * TILE, vel: 0,
         });
         break;
@@ -93,8 +94,8 @@ function collectSolids(world, self) {
 
 function liftRects(L) {
   return {
-    a: { x: L.ax, y: L.ay - L.off, w: L.w, h: 12 },
-    b: { x: L.bx, y: L.by + L.off, w: L.w, h: 12 },
+    a: { x: L.ax, y: L.ay - L.off, w: L.aw, h: 12 },
+    b: { x: L.bx, y: L.by + L.off, w: L.bw, h: 12 },
   };
 }
 
@@ -102,10 +103,14 @@ function liftRects(L) {
 
 function updateBoxes(world, level, dt) {
   for (const b of world.boxes) {
-    if (centerInWater(level, b)) {
-      // buoyancy: float with top ~poking out
-      b.vy -= 2400 * dt;
-      b.vy = damp(b.vy, 0, 4.5, dt);
+    const surf = waterSurfaceY(level, b.x + b.w / 2);
+    if (surf !== null && b.y + b.h > surf) {
+      // buoyancy: a damped spring that settles the box at the surface with
+      // its top riding ~8px proud, instead of bobbing forever
+      const targetTop = surf - 8;
+      const err = b.y - targetTop;                 // >0 = sitting too deep
+      b.vy += (-err * 14 - b.vy * 6) * dt;
+      b.vy = clamp(b.vy, -120, 160);
       b.vx = damp(b.vx, 0, 3, dt);
     } else {
       b.vy += GRAVITY * dt;
@@ -163,8 +168,9 @@ function updateLifts(world, dt, heavies) {
       if (h.x + h.w > r.a.x && h.x < r.a.x + r.a.w && Math.abs(feet - r.a.y) < 8) { wA++; riders.a.push(h); }
       if (h.x + h.w > r.b.x && h.x < r.b.x + r.b.w && Math.abs(feet - r.b.y) < 8) { wB++; riders.b.push(h); }
     }
-    // positive off = side A pushed down
-    const targetVel = (wA - wB) * 58;
+    // platform A rides at ay - off, B at by + off, so positive off =
+    // A up / B down: the heavier side must drive off the other way
+    const targetVel = (wB - wA) * 58;
     L.vel = damp(L.vel, targetVel, 6, dt);
     const prevOff = L.off;
     L.off = clamp(L.off + L.vel * dt, -L.travel, L.travel);
@@ -242,8 +248,10 @@ function updateCreatures(world, level, player, dt) {
         }
         break;
       case 'waking':
+        // no charging mid-waking: the growl is a hard 0.8 s warning —
+        // a full-speed runner needs ~0.35 s just to damp below the
+        // noise threshold, so charging earlier makes the tell a lie
         c.eye = damp(c.eye, 1, 5, dt);
-        if (c.eye > 0.55 && near && playerNoisy) startCharge(c, pcx);
         if (c.timer <= 0) {
           c.state = 'alert'; c.timer = 1.8 + Math.random() * 1.8;
           if (near) AudioSys.creatureOpen();

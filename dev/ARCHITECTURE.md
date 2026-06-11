@@ -59,7 +59,8 @@ Game.js should derive `level = { w, h, rows }` from this (`w` = row length,
 {t:'light', x,y, a0,a1, speed:0.5, phase:0, len:11, fov:0.30}  // angles in radians; y/x = fixture tile
 {t:'husk',  x,y}                               // y = tile whose bottom is the feet
 {t:'helm',  x,y}                               // 1×2-tile interaction zone
-{t:'lift',  ax,ay, bx,by, w:2, travel:3, off:0}  // two platform anchor points
+{t:'lift',  ax,ay, bx,by, w:2, travel:3, off:0}  // counterweight: A at ay-off, B at by+off
+                                               // w sets both platform widths; or aw/bw to size each
 {t:'creature', x,y, range:15}                  // y = floor tile it stands on
 {t:'check', x,y, idx:N}                        // idx = checkpoint index, ascending
 {t:'exit',  x,y, w:2, h:4}
@@ -82,7 +83,9 @@ creatureOpen`.
 
 ### player.js
 - `tileAt(level,tx,ty)`, `isSolidTile/isWaterTile/isGrassTile/isOnewayTile(c)`,
-  `rectHitsSolidTiles(level,x,y,w,h)`, `centerInWater/headInWater(level,ent)`.
+  `rectHitsSolidTiles(level,x,y,w,h)`, `centerInWater/headInWater(level,ent)`,
+  `waterSurfaceY(level,x) → y|null` (top of the water column at world-x;
+  box buoyancy springs toward it).
 - `moveEntity(ent, dt, level, solids, {oneway}) → {hitX, hitY, groundRef}` —
   axis-separated collision vs tiles + solid rects. `hitX` is `'tile'` or the
   `ref` of the rect hit (game.js uses a box ref hit to push boxes). The X
@@ -124,7 +127,7 @@ creatureOpen`.
 `init()` once. `buildBackground(kind, seed)` at chapter load. Per frame, in
 order: `sky(ctx,palette,time)` → `parallax(ctx,cam)` → `fogBand(ctx,cam,time,
 'rgba(120,140,160,0.045)')` → `tiles(ctx,level,cam,time)` (also draws grass &
-oneways) → entity drawing (mostly TODO in game.js or added here) →
+oneways) → entity drawing (Render.* per-entity, called from game.js) →
 `water(ctx,level,cam,time)` (over entities, translucent) →
 `humanoid(ctx, p, cam, {color, huskGlow, connected})` →
 `darkness(ctx, amount, holes)` when dark (holes = screen-space
@@ -133,11 +136,12 @@ oneways) → entity drawing (mostly TODO in game.js or added here) →
 Camera is `{x,y}` world px of the view's top-left (+ optional `dx` used by
 rain for parallax feel).
 
-Basic silhouettes exist for `box(ctx,b,cam)`, `door(ctx,d,cam)`,
-`plate(ctx,p,cam)` (pulled forward from T4 after user feedback — nothing
-collidable may be invisible). **Still to draw:** levers, light cones +
-fixtures, helms, lift platforms + ropes, creature, checkpoints, exits,
-hint text; plus proper styling of box/door/plate in T4.
+Drawn (mostly pulled forward from T4 in sessions 2–3): `box`, `door`,
+`plate`, `lever`, `lightCone`, `helm`, `lift` (ropes + slabs, per-platform
+width via `liftRects`), `creature` (body + eye), `check` (lamp),
+`exitGlow`. `humanoid` has a faint rim-light so the figure separates from
+same-value backgrounds. **Still to draw / refine in T4:** hint text, the
+darkness mask wiring polish, and final styling passes per DESIGN.
 
 ### game.js
 
@@ -147,8 +151,8 @@ fade (0 clear..1 black), fadeV, onFaded, danger, last}`.
 
 - `loadChapter(i)` — sets chapter/level, `Render.buildBackground`,
   `AudioSys.setMood`, then `resetChapterState()`.
-- `resetChapterState()` — respawns world from defs + player at
-  `playerStart` (checkpoint spawn comes in T3), snaps camera.
+- `resetChapterState()` — respawns world from defs + player at the
+  latched checkpoint (or `playerStart` if none), snaps camera.
 - `fadeOutThen(speed, cb)` — fade to black at `speed`/s, run cb, auto
   fade back in (fade-in always runs at 1.1/s whenever fadeV == 0).
 - `die(byHazard)` — play → dead → (fade) → reset → play. R key calls

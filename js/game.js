@@ -18,11 +18,33 @@ const Game = {
   onFaded: null,
   danger: 0,
   last: 0,
+  helmed: null,              // helm ref while connected (input routes to husks)
+  checkpointIdx: -1,         // last checkpoint reached; -1 = playerStart
 };
+
+// --------------------------- save / load ----------------------------
+
+const SAVE_KEY = 'hollow_save';
+
+function saveGame() {
+  try {
+    localStorage.setItem(SAVE_KEY,
+      JSON.stringify({ chapter: Game.chapterIdx, checkpointIdx: Game.checkpointIdx }));
+  } catch (e) { /* storage unavailable (private mode etc.) — play unsaved */ }
+}
+
+function loadSave() {
+  try {
+    const s = JSON.parse(localStorage.getItem(SAVE_KEY));
+    if (s && typeof s.chapter === 'number' && s.chapter >= 0 && s.chapter < LEVELS.length)
+      return s;
+  } catch (e) { /* corrupt/unavailable */ }
+  return null;
+}
 
 // ------------------------ chapter management ------------------------
 
-function loadChapter(i) {
+function loadChapter(i, checkpointIdx) {
   Game.chapterIdx = i;
   Game.chapter = LEVELS[i];
   Game.level = {
@@ -30,17 +52,30 @@ function loadChapter(i) {
     h: Game.chapter.rows.length,
     rows: Game.chapter.rows,
   };
+  Game.checkpointIdx = (checkpointIdx === undefined) ? -1 : checkpointIdx;
   Render.buildBackground(Game.chapter.bg, Game.chapter.seed);
   AudioSys.setMood(Game.chapter.mood);
   resetChapterState();
 }
 
-// Death/respawn rebuilds the whole world from defs. Checkpoint spawn
-// points arrive in T3; until then you respawn at playerStart.
+// Death/respawn rebuilds the whole world from defs (death resets the
+// entire chapter's entity state — see DESIGN.md), but you respawn at
+// the last checkpoint reached. Reached checkpoints stay reached.
 function resetChapterState() {
   Game.world = spawnEntities(Game.chapter.entities);
-  const s = Game.chapter.playerStart;
-  Game.player = makeHumanoid(s[0] * TILE + (TILE - 18) / 2, (s[1] + 1) * TILE - 42);
+  Game.helmed = null;
+  let sx = Game.chapter.playerStart[0] * TILE + (TILE - 18) / 2;
+  let sy = (Game.chapter.playerStart[1] + 1) * TILE - 42;
+  for (const c of Game.world.checks) {
+    if (c.idx <= Game.checkpointIdx) {
+      c.done = true;
+      if (c.idx === Game.checkpointIdx) {
+        sx = c.x + (c.w - 18) / 2;
+        sy = c.y + c.h - 42;
+      }
+    }
+  }
+  Game.player = makeHumanoid(sx, sy);
   Game.danger = 0;
   updateCamera(0, true);
 }
@@ -63,12 +98,24 @@ function die(byHazard) {
 // ----------------------------- camera -------------------------------
 
 function updateCamera(dt, snap) {
-  const p = Game.player, cam = Game.cam;
-  cam.look = snap ? p.facing * 70 : damp(cam.look, p.facing * 70, 1.6, dt);
+  const cam = Game.cam;
+  // focus: player, or the husk centroid while connected to a helm
+  let fx, fy, lookDir;
+  if (Game.helmed && Game.world.husks.length) {
+    fx = 0; fy = 0;
+    for (const h of Game.world.husks) { fx += h.x + h.w / 2; fy += h.y + h.h / 2; }
+    fx /= Game.world.husks.length; fy /= Game.world.husks.length;
+    lookDir = Game.world.husks[0].facing;
+  } else {
+    const p = Game.player;
+    fx = p.x + p.w / 2; fy = p.y + p.h / 2;
+    lookDir = p.facing;
+  }
+  cam.look = snap ? lookDir * 70 : damp(cam.look, lookDir * 70, 1.6, dt);
   const maxX = Math.max(0, Game.level.w * TILE - VIEW_W);
   const maxY = Math.max(0, Game.level.h * TILE - VIEW_H);
-  const tx = clamp(p.x + p.w / 2 + cam.look - VIEW_W / 2, 0, maxX);
-  const ty = clamp(p.y + p.h / 2 - VIEW_H * 0.58, 0, maxY);
+  const tx = clamp(fx + cam.look - VIEW_W / 2, 0, maxX);
+  const ty = clamp(fy - VIEW_H * 0.58, 0, maxY);
   if (snap) { cam.x = tx; cam.y = ty; cam.dx = 0; return; }
   const prevX = cam.x;
   cam.x = damp(cam.x, tx, 3.4, dt);
@@ -88,11 +135,35 @@ function updatePlay(dt) {
     up: Input.up(), down: Input.down(),
     jump: Input.jumpPressed(), jumpHeld: Input.jumpHeld(),
   };
+
+  // X/E press: helm connect/disconnect, else lever toggle. (Box grab is
+  // separate — it engages on hold, in updateBoxInteraction.)
+  if (Input.actPressed()) updateActInteraction(p, world);
+
+  const idle = { left: false, right: false, up: false, down: false, jump: false, jumpHeld: false };
+  // while helmed the player slumps and every husk mirrors your input
+  const playerCtl = Game.helmed ? { ...idle, down: true } : ctl;
+  const huskCtl = Game.helmed ? ctl : idle;
+
   const wasInWater = p.inWater;
-  updateHumanoid(p, ctl, dt, level, collectSolids(world, p), true);
+  updateHumanoid(p, playerCtl, dt, level, collectSolids(world, p), true);
   if (!wasInWater && p.inWater && p.vy > 40) AudioSys.splash();
 
-  updateBoxInteraction(p, world, dt);
+  for (const h of world.husks) {
+    const hWasInWater = h.inWater;
+    updateHumanoid(h, huskCtl, dt, level, collectSolids(world, h), false);
+    if (!hWasInWater && h.inWater && h.vy > 40) AudioSys.splash();
+    // husks push boxes like the player does (no grab — X/E is the helm key)
+    if (Game.helmed && h.grounded && !h.inWater &&
+        h.lastHitX && world.boxes.includes(h.lastHitX) &&
+        ((h.facing > 0 && huskCtl.right) || (h.facing < 0 && huskCtl.left))) {
+      h.lastHitX.vx = h.facing * 70;
+      h.pushTimer = 0.2;
+    }
+  }
+
+  if (Game.helmed) { p.grabbedBox = null; p.grabbing = false; }
+  else updateBoxInteraction(p, world, dt);
   updateBoxes(world, level, dt);
   const heavies = [p, ...world.husks, ...world.boxes];
   updatePlates(world, dt, heavies);
@@ -107,13 +178,28 @@ function updatePlay(dt) {
   Game.danger = Math.max(li.danger, cr.danger);
   if (li.killed || cr.killed) { die(true); return; }
 
+  for (const c of world.checks) {
+    if (!c.done && aabb(p, c)) {
+      c.done = true;
+      Game.checkpointIdx = c.idx;
+      AudioSys.checkpoint();
+      saveGame();
+    }
+  }
+  for (const hm of world.helms)
+    hm.glow = damp(hm.glow, Game.helmed === hm ? 1 : 0.3, 4, dt);
+
   if (Game.fadeV === 0) {
     for (const ex of world.exits) {
       if (aabb(p, ex)) {
         fadeOutThen(1.3, () => {
           const n = Game.chapterIdx + 1;
-          if (n < LEVELS.length) { loadChapter(n); Game.state = 'play'; }
-          else { loadChapter(0); Game.state = 'title'; }
+          if (n < LEVELS.length) { loadChapter(n); Game.state = 'play'; saveGame(); }
+          else {
+            // game finished: clear the save so continue starts fresh
+            try { localStorage.removeItem(SAVE_KEY); } catch (e) { /* ok */ }
+            loadChapter(0); Game.state = 'title';
+          }
         });
         break;
       }
@@ -121,6 +207,31 @@ function updatePlay(dt) {
   }
 
   updateCamera(dt, false);
+}
+
+// X/E pressed: helm has priority, then levers. Reach is the player's
+// body padded a few px — you interact with what you're standing at.
+function updateActInteraction(p, world) {
+  if (Game.helmed) {
+    Game.helmed = null;
+    AudioSys.disconnect();
+    return;
+  }
+  const reach = { x: p.x - 6, y: p.y - 4, w: p.w + 12, h: p.h + 8 };
+  for (const hm of world.helms) {
+    if (aabb(reach, hm) && world.husks.length) {
+      Game.helmed = hm;
+      AudioSys.connect();
+      return;
+    }
+  }
+  for (const l of world.levers) {
+    if (aabb(reach, l)) {
+      l.on = !l.on;
+      AudioSys.lever();
+      return;
+    }
+  }
 }
 
 // Push (walk into a box) and grab/pull (hold X/E next to one).
@@ -181,13 +292,21 @@ function drawPlay(dt) {
   Render.parallax(ctx, cam);
   Render.fogBand(ctx, cam, Game.time, 'rgba(120,140,160,0.045)');
   Render.tiles(ctx, Game.level, cam, Game.time);
-  // remaining entity types (levers/lights/helms/lifts/...) land in T4
+  // basic silhouettes for everything collidable/lethal (styled in T4)
+  for (const ex of Game.world.exits) Render.exitGlow(ctx, ex, cam, Game.time);
+  for (const c of Game.world.checks) Render.check(ctx, c, cam, Game.time);
+  for (const L of Game.world.lifts) Render.lift(ctx, L, cam);
+  for (const hm of Game.world.helms) Render.helm(ctx, hm, cam, Game.time);
+  for (const lv of Game.world.levers) Render.lever(ctx, lv, cam);
   for (const pl of Game.world.plates) Render.plate(ctx, pl, cam);
   for (const d of Game.world.doors) Render.door(ctx, d, cam);
   for (const b of Game.world.boxes) Render.box(ctx, b, cam);
+  for (const cr of Game.world.creatures) Render.creature(ctx, cr, cam, Game.time);
   Render.water(ctx, Game.level, cam, Game.time);
-  for (const h of Game.world.husks) Render.humanoid(ctx, h, cam, { huskGlow: true });
+  for (const h of Game.world.husks)
+    Render.humanoid(ctx, h, cam, { huskGlow: true, connected: !!Game.helmed });
   Render.humanoid(ctx, Game.player, cam, {});
+  for (const Lt of Game.world.lights) Render.lightCone(ctx, Lt, cam);
   if (ch.dark) {
     const p = Game.player;
     Render.darkness(ctx, 0.93, [
@@ -234,6 +353,10 @@ function frame(ts) {
     // title you haven't seen yet
     if (Input.anyKeyThisFrame && Game.fadeV === 0 && Game.fade < 0.5) {
       fadeOutThen(1.6, () => {
+        // continue from save when one exists (proper title UI lands in T5)
+        const sv = loadSave();
+        if (sv && (sv.chapter !== Game.chapterIdx || sv.checkpointIdx !== Game.checkpointIdx))
+          loadChapter(sv.chapter, sv.checkpointIdx);
         AudioSys.setMood(Game.chapter.mood);
         Game.state = 'play';
       });

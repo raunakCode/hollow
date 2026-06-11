@@ -144,6 +144,15 @@ function headInWater(level, ent) {
   const cy = Math.floor((ent.y + 6) / TILE);
   return isWaterTile(tileAt(level, cx, cy));
 }
+// y of the water surface (top of the topmost water tile) in the column
+// at world-x `x`, or null if that column holds no water.
+function waterSurfaceY(level, x) {
+  const cx = Math.floor(x / TILE);
+  for (let ty = 0; ty < level.rows.length; ty++) {
+    if (isWaterTile(tileAt(level, cx, ty))) return ty * TILE;
+  }
+  return null;
+}
 
 // ----------------------------------------------------------------
 // Humanoid mover: shared by the player and husks.
