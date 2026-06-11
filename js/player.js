@@ -53,6 +53,9 @@ function moveEntity(ent, dt, level, solids, opts) {
     }
     // solid rects
     for (const s of solids) {
+      // floor-like contact (top within ~4px of our feet, e.g. a floating
+      // box bobbing up under a rider) is a step, not a wall
+      if (s.y >= ent.y + ent.h - 4) continue;
       const r = { x: nx, y: ent.y, w: ent.w, h: ent.h };
       if (aabb(r, s)) {
         if (dx > 0) nx = Math.min(nx, s.x - ent.w);
@@ -153,6 +156,9 @@ function makeHumanoid(x, y) {
     runPhase: 0, airTime: 0, coyote: 0, jumpBuf: 0,
     mantle: null,        // {t, fromX, fromY, toX, toY}
     pushTimer: 0, stepTimer: 0,
+    lastHitX: null,      // moveEntity hitX from this frame (game.js push check)
+    grabbing: false, grabbedBox: null,
+    jumpFromY: y,        // y of last solid footing (caps mantle climb height)
     state: 'idle',
   };
 }
@@ -175,7 +181,7 @@ function updateHumanoid(p, ctl, dt, level, solids, sounds) {
   p.crouch = !!(ctl.down && p.grounded && !p.inWater);
 
   const accel = p.inWater ? 600 : (p.grounded ? 1700 : 1100);
-  const maxSpd = p.inWater ? 130 : (p.crouch ? 80 : 215);
+  const maxSpd = p.inWater ? 130 : (p.crouch ? 80 : (p.grabbing ? 90 : 215));
   const fric = p.inWater ? 3 : (p.grounded ? 14 : 2.5);
 
   let move = 0;
@@ -223,6 +229,10 @@ function updateHumanoid(p, ctl, dt, level, solids, sounds) {
   const wasVy = p.vy;
   const res = moveEntity(p, dt, level, solids, { oneway: true });
   p.grounded = res.groundRef !== null && p.vy >= 0;
+  p.lastHitX = res.hitX;
+  // remember the height of the last solid footing; mantle uses it to cap
+  // total climb (water counts: you can always haul out onto a low ledge)
+  if (p.grounded || p.inWater) p.jumpFromY = p.y;
 
   if (!wasGrounded && p.grounded && wasVy > 380 && sounds) AudioSys.land();
   if (p.inWater && !centerInWater(level, { ...p, y: p.y - p.vy * dt })) { /* noop */ }
@@ -236,7 +246,10 @@ function updateHumanoid(p, ctl, dt, level, solids, sounds) {
         !isSolidTile(tileAt(level, tx, chestTy - 1)) &&
         !isSolidTile(tileAt(level, tx, chestTy - 2))) {
       const ledgeTopY = chestTy * TILE;
-      if (ledgeTopY > p.y - 6 && ledgeTopY < p.y + p.h * 0.7) {
+      // total climb from last footing must stay under ~3.2 tiles: keeps
+      // 3-tile walls mantleable but 4-tile walls impossible without a box
+      const climb = (p.jumpFromY + p.h) - ledgeTopY;
+      if (climb <= 102 && ledgeTopY > p.y - 6 && ledgeTopY < p.y + p.h * 0.7) {
         const toX = move > 0 ? tx * TILE + 4 : tx * TILE + TILE - p.w - 4;
         const toY = ledgeTopY - p.h;
         // make sure the player fits up there

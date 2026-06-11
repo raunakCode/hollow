@@ -11,10 +11,16 @@ js/audio.js     AudioSys: procedural ambience + one-shot SFX
 js/player.js    tile queries, moveEntity physics, makeHumanoid/updateHumanoid
 js/entities.js  spawnEntities, collectSolids, per-system update functions
 js/render.js    Render: backgrounds, tiles, humanoid drawing, post fx
-js/levels1.js   NOT WRITTEN — chapters 1–4 (must define global LEVELS = [] and push)
-js/levels2.js   NOT WRITTEN — chapters 5–8 (pushes onto LEVELS)
-js/game.js      NOT WRITTEN — state machine, camera, orchestration, main loop
+js/levels1.js   chapters 1–4 — defines global LEVELS = [] and pushes onto it
+                (currently holds only the T1/T2 TEST GROUNDS map; replaced in T6)
+js/levels2.js   chapters 5–8 — stub, pushes onto LEVELS in T10–T13
+js/game.js      state machine, camera, orchestration, main loop
 ```
+
+Dev tools (not loaded by the game): `dev/headless.js` — node smoke test
+that runs the real scripts against stubbed DOM/audio and walks the test
+map (run `node dev/headless.js`); `dev/browser-test.js` — headless-
+Chromium smoke test of index.html itself (setup notes in its header).
 
 No modules, no fetch — everything is global-scope script, must run from
 `file://`. Canvas is 960×540 (`VIEW_W/VIEW_H`), letterboxed via `fitCanvas`.
@@ -76,13 +82,22 @@ creatureOpen`.
   `rectHitsSolidTiles(level,x,y,w,h)`, `centerInWater/headInWater(level,ent)`.
 - `moveEntity(ent, dt, level, solids, {oneway}) → {hitX, hitY, groundRef}` —
   axis-separated collision vs tiles + solid rects. `hitX` is `'tile'` or the
-  `ref` of the rect hit (game.js uses a box ref hit to push boxes).
+  `ref` of the rect hit (game.js uses a box ref hit to push boxes). The X
+  pass skips solids whose top is within ~4px of the entity's feet —
+  floor-like contact is a step, not a wall (stops a bobbing floating box
+  from ejecting its rider sideways).
 - `makeHumanoid(x,y)` → 18×42 entity. `updateHumanoid(p, ctl, dt, level,
   solids, sounds)` — full controller: run/jump (coyote+buffer)/swim/crouch/
   auto-mantle. `ctl = {left,right,up,down,jump,jumpHeld}` booleans, so the
   same function drives the player (from Input) and husks (mirrored ctl or
   all-false when frozen). `sounds` truthy = emit SFX (pass false for husks or
   make them quieter). GRAVITY=1900, jump v=-640.
+  Fields game.js relies on: `p.lastHitX` (this frame's moveEntity hitX),
+  `p.grabbing`/`p.grabbedBox` (set by game.js; grabbing caps run speed at
+  90), `p.jumpFromY` (y of last solid/water footing — mantle rejects
+  climbs where launch-feet minus ledge-top exceeds 102px ≈ 3.2 tiles, so
+  3-tile walls mantle but 4-tile walls need a box; raw jump apex would
+  otherwise reach a 4-tile ledge).
 
 ### entities.js
 - `spawnEntities(defs) → world` with arrays: boxes, doors, levers, plates,
@@ -99,8 +114,8 @@ creatureOpen`.
   doors); `updateCreatures(world, level, player, dt) → {killed, danger}`.
 - Levers/helms do NOT self-update: game.js handles `Input.actPressed()`
   proximity interaction (lever toggle + `AudioSys.lever()`, helm
-  connect/disconnect), box grab/pull, and push (on player `hitX` box ref:
-  set `box.vx = facing*70`, `player.pushTimer = 0.2`).
+  connect/disconnect — both still TODO, T3). Box push + grab/pull ARE
+  implemented: `updateBoxInteraction` in game.js (see below).
 
 ### render.js (Render)
 `init()` once. `buildBackground(kind, seed)` at chapter load. Per frame, in
@@ -119,6 +134,41 @@ rain for parallax feel).
 + fixtures, helms, lift platforms + ropes, creature, checkpoints, exits,
 hint text. Add these as Render methods in the entity-render task.
 
+### game.js
+
+Global `Game` object: `{state ('title'|'play'|'dead'), chapterIdx, chapter
+(LEVELS def), level ({w,h,rows}), world, player, cam {x,y,dx,look}, time,
+fade (0 clear..1 black), fadeV, onFaded, danger, last}`.
+
+- `loadChapter(i)` — sets chapter/level, `Render.buildBackground`,
+  `AudioSys.setMood`, then `resetChapterState()`.
+- `resetChapterState()` — respawns world from defs + player at
+  `playerStart` (checkpoint spawn comes in T3), snaps camera.
+- `fadeOutThen(speed, cb)` — fade to black at `speed`/s, run cb, auto
+  fade back in (fade-in always runs at 1.1/s whenever fadeV == 0).
+- `die(byHazard)` — play → dead → (fade) → reset → play. R key calls
+  `die(false)`; lights/creature kills call `die(true)` + death SFX.
+- `updateCamera(dt, snap)` — damped follow, facing look-ahead (±70 px,
+  damped), clamped to level bounds; `cam.dx` feeds rain parallax.
+- `updatePlay(dt)` — ctl from Input → `updateHumanoid` (splash SFX on
+  water entry) → `updateBoxInteraction` → updateBoxes/Plates/Doors/Lifts
+  (heavies = [player, husks, boxes]) → hidden = crouch-in-grass →
+  updateLights/Creatures → danger/kills → exit check (next chapter or
+  back to title) → camera.
+- `updateBoxInteraction(p, world, dt)` — push: if `p.lastHitX` is a box
+  and the player is grounded, dry, and pressing toward it → `box.vx =
+  facing*70`, `p.pushTimer = 0.2`, throttled `boxDrag` SFX. Grab: hold
+  X/E while grounded next to a box (≤10px gap, same floor ±20px) →
+  `p.grabbedBox`; box gets `clamp(p.vx, ±90)` each frame, player faces
+  the box, grab breaks on release/jump/separation >14px/floor mismatch.
+  Box velocity set here is integrated by updateBoxes the same frame.
+- Frame order: title? drawTitle : (updatePlay + drawPlay) → fade overlay
+  → `AudioSys.update(dt, danger)` → `Input.endFrame()`. dt clamped to
+  ≤ 1/30 (headless Chromium runs rAF at ~120 fps — physics are dt-true).
+- Audio autoplay: a dedicated `window` keydown listener calls
+  `AudioSys.init()` (+ resume if suspended); title exit also requires
+  `Game.fade < 0.5` so the boot keypress can't skip an unseen title.
+
 ## Conventions & gotchas
 
 - Death = reset entire chapter (respawn world from defs) but spawn at the
@@ -131,5 +181,7 @@ hint text. Add these as Render methods in the entity-render task.
   humanoids comes from `collectSolids`.
 - One-way `-` tiles only catch falling entities whose feet were above them.
 - `damp()` everywhere for smoothing — never lerp by raw dt factors.
-- Nothing has been run in a browser yet. Expect first-run bugs; budget
-  time for them in the bring-up task.
+- T1 verified in node (dev/headless.js) and headless Chromium
+  (dev/browser-test.js): movement, mantle, oneway, gap, swim, respawn,
+  title flow, audio init — zero console errors. Subjective feel and the
+  audio mix still need a human pass (T2).

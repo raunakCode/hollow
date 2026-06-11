@@ -6,7 +6,7 @@ in part of one session; doing several per session is expected and fine.
 
 ## Milestone 1 — it runs
 
-- [ ] **T1. Core loop & bring-up.** Write `js/game.js`: requestAnimationFrame
+- [x] **T1. Core loop & bring-up.** Write `js/game.js`: requestAnimationFrame
   loop (dt clamped ≤ 1/30), state machine (`title → play → dead → play`,
   chapter fade transitions), chapter loading (`LEVELS[i]` → level + world via
   `spawnEntities`), camera (smooth follow + facing look-ahead, clamped),
@@ -78,3 +78,5 @@ death-reset rule, set palette/mood/bg, playtest start-to-finish twice.
 ---
 **Session log** (append one line per session: date — tasks touched — result)
 - 2026-06-10 — engine scaffold (util/audio/player/entities/render) + docs — untested.
+- 2026-06-11 — T1 done: game.js + test map + node/browser smoke tests (dev/headless.js, dev/browser-test.js) — all green, 0 console errors.
+- 2026-06-11 — T2 mechanics: push/grab-pull, mantle climb cap (4-tile walls now box-only), rider-eject fix, T2 gauntlet in test map — 30 assertions green; T2 left unchecked pending human feel/audio pass (see STATUS).
