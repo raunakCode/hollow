@@ -68,6 +68,23 @@ Written this session:
   pulled forward from T4 (Render.box/door/plate). Rule going forward:
   **never ship an invisible collider**, even in test maps.
 
+### "Sometimes stuck in the ground" report (2026-06-11) — investigated
+
+User reported intermittently getting stuck, couldn't reproduce after the
+round-1 fixes. Investigation: built `dev/fuzz.js` (random-input fuzzer,
+8 seeds × 25k frames ≈ 56 min of play) checking every frame for player-
+in-tiles, player-deep-in-box, and box-in-tiles — **zero failures**.
+Most likely explanation: before round 1, the closed door and boxes were
+invisible colliders — running against them looks exactly like being
+stuck. Fixed proactively while auditing: mantle target now checks
+solids (boxes/doors/lift platforms), not just tiles, so mantling onto
+an occupied ledge is blocked instead of embedding the player in a box
+(unreachable in this map, real risk in chapter maps). If the user
+reports it again now that everything renders, get the exact spot —
+known remaining soft spots: box gliding into a player pinned against a
+wall can cause a sideways snap-out jolt (boxes don't collide with the
+player by design).
+
 ## Needs the user (T2 sign-off)
 
 Mechanics are machine-verified; these acceptance criteria need a human

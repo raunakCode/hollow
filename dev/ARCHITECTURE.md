@@ -20,7 +20,10 @@ js/game.js      state machine, camera, orchestration, main loop
 Dev tools (not loaded by the game): `dev/headless.js` — node smoke test
 that runs the real scripts against stubbed DOM/audio and walks the test
 map (run `node dev/headless.js`); `dev/browser-test.js` — headless-
-Chromium smoke test of index.html itself (setup notes in its header).
+Chromium smoke test of index.html itself (setup notes in its header);
+`dev/fuzz.js` — random-input fuzzer that flags embed/stuck states
+(player-in-tiles, player-deep-in-box, box-in-tiles). Run all three
+after engine changes.
 
 No modules, no fetch — everything is global-scope script, must run from
 `file://`. Canvas is 960×540 (`VIEW_W/VIEW_H`), letterboxed via `fitCanvas`.

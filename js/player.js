@@ -252,8 +252,14 @@ function updateHumanoid(p, ctl, dt, level, solids, sounds) {
       if (climb <= 102 && ledgeTopY > p.y - 6 && ledgeTopY < p.y + p.h * 0.7) {
         const toX = move > 0 ? tx * TILE + 4 : tx * TILE + TILE - p.w - 4;
         const toY = ledgeTopY - p.h;
-        // make sure the player fits up there
-        if (!rectHitsSolidTiles(level, toX, toY, p.w, p.h)) {
+        // make sure the player fits up there (tiles AND solids — a box
+        // sitting on the ledge must block the mantle, not swallow us)
+        let blocked = rectHitsSolidTiles(level, toX, toY, p.w, p.h);
+        if (!blocked) {
+          const target = { x: toX, y: toY, w: p.w, h: p.h };
+          for (const s of solids) if (aabb(target, s)) { blocked = true; break; }
+        }
+        if (!blocked) {
           p.mantle = { t: 0, fromX: p.x, fromY: p.y, toX, toY };
           if (sounds) AudioSys.land();
         }
