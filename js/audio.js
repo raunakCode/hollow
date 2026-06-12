@@ -193,6 +193,7 @@ const AudioSys = {
   step()      { this._thud(0.07, 0.10, 700); },
   jump()      { this._thud(0.12, 0.12, 500); },
   land()      { this._thud(0.16, 0.22, 320); },
+  gasp()      { this._thud(0.45, 0.22, 1100); },   // sharp inhale breaking the surface
 
   // One air bubble (Farnell / Minnaert model): a sine at the cavity's
   // resonant pitch that rises as the bubble collapses, amplitude decaying

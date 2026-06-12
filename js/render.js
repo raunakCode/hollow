@@ -333,8 +333,9 @@ const Render = {
     // fixture
     ctx.fillStyle = '#05070b';
     ctx.beginPath(); ctx.arc(x, y, 7, 0, Math.PI * 2); ctx.fill();
-    // beam: soft gradient wedge, brightens as detection fills
-    const a = 0.10 + Lt.detect * 0.22;
+    // beam: soft gradient wedge, brightens as detection fills. A
+    // signal-disabled fixture goes dark (just a faint dead glow).
+    const a = Lt.disabled ? 0.012 : 0.10 + Lt.detect * 0.22;
     const g = ctx.createRadialGradient(x, y, 10, x, y, Lt.len);
     g.addColorStop(0, `rgba(200,215,235,${(a * 1.4).toFixed(3)})`);
     g.addColorStop(0.7, `rgba(190,205,230,${a.toFixed(3)})`);
@@ -448,6 +449,23 @@ const Render = {
     ctx.fillRect(x, y, e.w, e.h);
   },
 
+  // Faint serif key-glyph caption, fades in by proximity (alpha set in
+  // game.js). Drawn in world space; no box, no chrome — just dim letters.
+  hint(ctx, h, cam) {
+    if (h.alpha < 0.01) return;
+    const x = h.x - cam.x, y = h.y - cam.y;
+    ctx.save();
+    ctx.globalAlpha = h.alpha * 0.55;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = '20px Georgia, "Times New Roman", serif';
+    ctx.fillStyle = 'rgba(205,215,230,1)';
+    ctx.shadowColor = 'rgba(0,0,0,0.6)';
+    ctx.shadowBlur = 6;
+    ctx.fillText(h.text, x, y);
+    ctx.restore();
+  },
+
   // ---------------------- humanoid figure ----------------------
   humanoid(ctx, p, cam, opts) {
     opts = opts || {};
@@ -483,6 +501,17 @@ const Render = {
     } else {
       legA.fx = cx - 4; legB.fx = cx + 4;
     }
+
+    // The legs are stroked with round caps, so the rounded "toe" extends half
+    // a line-width BELOW the foot endpoint. With the foot endpoint sitting at
+    // p.y+p.h (the true floor contact), that overshoot pokes ~3.5px under the
+    // ground lip and reads as the figure being sunk into the ground — worst
+    // next to a tall dark door/box that gives the eye a vertical reference.
+    // Lift the planted foot by the widest (rim) cap radius so the toe rests ON
+    // the floor line instead of through it.
+    const footCap = (4.5 + 2.6) / 2;
+    legA.fy = Math.min(legA.fy, feet - footCap);
+    legB.fy = Math.min(legB.fy, feet - footCap);
 
     const shY = hipY - 14 + (p.state === 'crouch' ? 5 : 0);
     const shX = cx + Math.sin(lean) * 10;

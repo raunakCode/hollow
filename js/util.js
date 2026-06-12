@@ -41,6 +41,14 @@ const Input = {
   grabHeld()    { return !!(this.keys['KeyX'] || this.keys['KeyE']); },
   actPressed()  { return !!(this.pressed['KeyX'] || this.pressed['KeyE']); },
 
+  // Menu navigation (title + pause). Arrows/WS move the cursor only; a
+  // separate confirm set selects — kept disjoint so ArrowUp never both
+  // moves and confirms (ArrowUp is also a jump key in play).
+  menuUp()      { return !!(this.pressed['ArrowUp'] || this.pressed['KeyW']); },
+  menuDown()    { return !!(this.pressed['ArrowDown'] || this.pressed['KeyS']); },
+  menuConfirm() { return !!(this.pressed['Space'] || this.pressed['Enter'] || this.pressed['KeyZ'] || this.pressed['KeyX'] || this.pressed['KeyE']); },
+  escPressed()  { return !!this.pressed['Escape']; },
+
   endFrame() { this.pressed = {}; this.anyKeyThisFrame = false; },
 };
 

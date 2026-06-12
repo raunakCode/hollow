@@ -12,7 +12,10 @@ js/player.js    tile queries, moveEntity physics, makeHumanoid/updateHumanoid
 js/entities.js  spawnEntities, collectSolids, per-system update functions
 js/render.js    Render: backgrounds, tiles, humanoid drawing, post fx
 js/levels1.js   chapters 1–4 — defines global LEVELS = [] and pushes onto it
-                (currently holds only the T1/T2 TEST GROUNDS map; replaced in T6)
+                (Ch.1 THE FOREST is live; 2–4 appended as built)
+dev/testmap.js  DEV-ONLY all-mechanics TEST GROUNDS sheet. Not in index.html;
+                the harnesses load it after levels2.js / before game.js, where
+                it does LEVELS.length=0 + push() to replace the chapter list.
 js/levels2.js   chapters 5–8 — stub, pushes onto LEVELS in T10–T13
 js/game.js      state machine, camera, orchestration, main loop
 ```
@@ -56,7 +59,7 @@ Game.js should derive `level = { w, h, rows }` from this (`w` = row length,
 {t:'door',  x,y, h:3, links:['id'], mode:'all'|'any', latch:true}
 {t:'lever', x,y, id:'id', on:false}
 {t:'plate', x,y, id:'id', w:2, hold:0}        // y = tile the plate sits IN (top of floor)
-{t:'light', x,y, a0,a1, speed:0.5, phase:0, len:11, fov:0.30}  // angles in radians; y/x = fixture tile
+{t:'light', x,y, a0,a1, speed:0.5, phase:0, len:11, fov:0.30, offWhen:'id'}  // angles in radians; y/x = fixture tile. offWhen: signal id that powers the cone DOWN (disabled = no detection, dims in render)
 {t:'husk',  x,y}                               // y = tile whose bottom is the feet
 {t:'helm',  x,y}                               // 1×2-tile interaction zone
 {t:'lift',  ax,ay, bx,by, w:2, travel:3, off:0}  // counterweight: A at ay-off, B at by+off
@@ -65,6 +68,7 @@ Game.js should derive `level = { w, h, rows }` from this (`w` = row length,
 {t:'check', x,y, idx:N}                        // idx = checkpoint index, ascending
 {t:'exit',  x,y, w:2, h:4}
 {t:'hint',  x,y, text:'←  →', r:5}
+{t:'trigger', x,y, w:2, h:4, target:0, action:'charge'|'wake', once:true}  // scripted chase: fires when the player enters; acts on world.creatures[target]
 ```
 
 ## Key APIs already implemented
@@ -73,13 +77,16 @@ Game.js should derive `level = { w, h, rows }` from this (`w` = row length,
 `clamp lerp damp(cur,target,rate,dt) aabb(a,b) dist makeRng(seed)`
 `Input.left/right/up/down/jumpHeld/jumpPressed/grabHeld/actPressed()` —
 call `Input.endFrame()` at end of each frame. `fitCanvas(canvas)` once.
+Menus: `Input.menuUp/menuDown()` (Arrows/WS, move cursor), `menuConfirm()`
+(Space/Enter/Z/X/E — disjoint from nav so ArrowUp never both moves & selects),
+`escPressed()` (Escape, pause toggle).
 
 ### audio.js (AudioSys)
 `init()` (must be inside a user-gesture handler; also kicks off `_loadSamples`),
 `toggleMute()`, `setMood({drone,wind,rain,pitch})`, `update(dt, dangerLevel)`
-every frame (drives heartbeat). One-shots: `step jump land splash boxDrag lever
-doorMove connect disconnect detectTick alarm death checkpoint creatureGrowl
-creatureOpen`.
+every frame (drives heartbeat). One-shots: `step jump land gasp splash boxDrag
+lever doorMove connect disconnect detectTick alarm death checkpoint creatureGrowl
+creatureOpen`. (`gasp` = surfacing inhale once breath refills past the warn line.)
 
 **Recorded samples (session 5):** `AUDIO_SAMPLES` (top of file) maps names →
 `assets/audio/*.wav`, loaded via `fetch`+`decodeAudioData` into `this.samples`
@@ -101,9 +108,14 @@ game.js `updatePlay` calls `setWaterLevel` each frame via `waterProximity(level,
   pass skips solids whose top is within ~4px of the entity's feet —
   floor-like contact is a step, not a wall (stops a bobbing floating box
   from ejecting its rider sideways).
-- `makeHumanoid(x,y)` → 18×42 entity. `updateHumanoid(p, ctl, dt, level,
+- `makeHumanoid(x,y)` → 18×`STAND_H` entity. `updateHumanoid(p, ctl, dt, level,
   solids, sounds)` — full controller: run/jump (coyote+buffer)/swim/crouch/
-  auto-mantle. `ctl = {left,right,up,down,jump,jumpHeld}` booleans, so the
+  auto-mantle. **Crouch shrinks the collider**: while `ctl.down` is held on the
+  ground the box resizes (feet-anchored) from `STAND_H=42` to `CROUCH_H=25` so
+  the figure fits under a 1-tile (32px) gap; you also can't stand back up while
+  a ceiling is overhead (a headroom test vs tiles + `solids` keeps `p.crouch`
+  true until you clear it). `p.h` is therefore dynamic — read it, don't assume
+  42. `ctl = {left,right,up,down,jump,jumpHeld}` booleans, so the
   same function drives the player (from Input) and husks (mirrored ctl or
   all-false when frozen). `sounds` truthy = emit SFX (pass false for husks or
   make them quieter). GRAVITY=1900, jump v=-640.
@@ -115,8 +127,11 @@ game.js `updatePlay` calls `setWaterLevel` each frame via `waterProximity(level,
   otherwise reach a 4-tile ledge).
 
 ### entities.js
-- `spawnEntities(defs) → world` with arrays: boxes, doors, levers, plates,
-  lights, husks, helms, lifts, creatures, checks, exits, hints.
+- `spawnEntities(defs, seed) → world` with arrays: boxes, doors, levers, plates,
+  lights, husks, helms, lifts, creatures, checks, exits, hints, triggers.
+  `seed` (chapter seed) feeds a `makeRng` so spawn jitter (light phase, creature
+  timer, each creature's own `rng` stream) is **deterministic** — same chapter
+  boots identically and dev harnesses are reproducible. (Was `Math.random()`.)
 - `collectSolids(world, self)` → rects blocking a humanoid/box (boxes, closed
   doors, lift platforms). `liftRects(L)` → `{a,b}` platform rects.
 - Per-frame (call in this order from game.js):
@@ -124,13 +139,18 @@ game.js `updatePlay` calls `setWaterLevel` each frame via `waterProximity(level,
   `updatePlates(world, dt, heavies)` where heavies = [player, ...husks,
   ...boxes]; `updateDoors(world, dt)` (reads signals from levers+plates via
   `evalSignals`); `updateLifts(world, dt, heavies)` (carries riders);
+  `updateTriggers(world, player)` (scripted chase zones; fires once on enter);
   `updateLights(world, level, player, hidden, dt) → {killed, danger}`
   (`hidden` = crouching in grass; handles occlusion raycast vs tiles/boxes/
-  doors); `updateCreatures(world, level, player, dt) → {killed, danger}`.
+  doors; a light whose `offWhen` signal is active sets `Lt.disabled`, skips
+  detection, and dims in render); `updateCreatures(world, level, player, dt) →
+  {killed, danger}`.
+- `creatureStartCharge(c, px)` — force a creature into an immediate lunge toward
+  world-x `px`; shared by the natural alert→charge path and trigger zones.
 - Levers/helms do NOT self-update: game.js handles `Input.actPressed()`
   proximity interaction (lever toggle + `AudioSys.lever()`, helm
-  connect/disconnect — both still TODO, T3). Box push + grab/pull ARE
-  implemented: `updateBoxInteraction` in game.js (see below).
+  connect/disconnect — both implemented in T3). Box push + grab/pull are in
+  `updateBoxInteraction` in game.js (see below).
 
 ### render.js (Render)
 `init()` once. `buildBackground(kind, seed)` at chapter load. Per frame, in
@@ -148,15 +168,16 @@ rain for parallax feel).
 Drawn (mostly pulled forward from T4 in sessions 2–3): `box`, `door`,
 `plate`, `lever`, `lightCone`, `helm`, `lift` (ropes + slabs, per-platform
 width via `liftRects`), `creature` (body + eye), `check` (lamp),
-`exitGlow`. `humanoid` has a faint rim-light so the figure separates from
-same-value backgrounds. **Still to draw / refine in T4:** hint text, the
-darkness mask wiring polish, and final styling passes per DESIGN.
+`exitGlow`, `hint`. `humanoid` has a faint rim-light so the figure separates
+from same-value backgrounds. `hint(ctx, h, cam)` draws a faint serif key-glyph
+at `h.alpha` (game.js fades alpha in/out by player proximity to `h.r`).
 
 ### game.js
 
 Global `Game` object: `{state ('title'|'play'|'dead'), chapterIdx, chapter
 (LEVELS def), level ({w,h,rows}), world, player, cam {x,y,dx,look}, time,
-fade (0 clear..1 black), fadeV, onFaded, danger, last}`.
+fade (0 clear..1 black), fadeV, onFaded, danger, last, helmed, checkpointIdx,
+breath, paused, pauseSel, titleSel}`. Consts: `BREATH_MAX=9`, `BREATH_WARN=4`.
 
 - `loadChapter(i)` — sets chapter/level, `Render.buildBackground`,
   `AudioSys.setMood`, then `resetChapterState()`.
@@ -170,9 +191,21 @@ fade (0 clear..1 black), fadeV, onFaded, danger, last}`.
   damped), clamped to level bounds; `cam.dx` feeds rain parallax.
 - `updatePlay(dt)` — ctl from Input → `updateHumanoid` (splash SFX on
   water entry) → `updateBoxInteraction` → updateBoxes/Plates/Doors/Lifts
-  (heavies = [player, husks, boxes]) → hidden = crouch-in-grass →
-  updateLights/Creatures → danger/kills → exit check (next chapter or
-  back to title) → camera.
+  (heavies = [player, husks, boxes]) → `updateTriggers` → hidden =
+  crouch-in-grass → updateLights/Creatures → **breath** (drains while
+  `headInWater`, drown→`die(true)` at 0; refills ×4/s at the surface,
+  `gasp` SFX crossing the warn line; low breath feeds `Game.danger`) →
+  danger/kills → checkpoints/save → exit check → camera.
+- **Breath UX**: `drawPlay` closes the view to a shrinking porthole
+  (`Render.darkness` with a hole at the player) once `breath < BREATH_WARN`.
+- **Pause** (`Esc`, only in play, ignored mid-fade): `Game.paused` freezes
+  `updatePlay`; `updatePauseMenu()` + `drawPause()` give resume / restart
+  (`resetChapterState`) / mute (`AudioSys.toggleMute`), `Game.pauseSel` cursor.
+- **Title** (`updateTitle`/`drawTitle`): with a save present, a `continue`/
+  `new game` menu (`Game.titleSel`, nav + `menuConfirm`); with none, "press
+  any key" → new game. New game clears the save and loads chapter 0; continue
+  loads the saved chapter+checkpoint. Gated on `fade < 0.5` (boot keypress
+  can't skip an unseen title).
 - `updateBoxInteraction(p, world, dt)` — push: if `p.lastHitX` is a box
   and the player is grounded, dry, and pressing toward it → `box.vx =
   facing*70`, `p.pushTimer = 0.2`, throttled `boxDrag` SFX. Grab: hold
@@ -180,8 +213,9 @@ fade (0 clear..1 black), fadeV, onFaded, danger, last}`.
   `p.grabbedBox`; box gets `clamp(p.vx, ±90)` each frame, player faces
   the box, grab breaks on release/jump/separation >14px/floor mismatch.
   Box velocity set here is integrated by updateBoxes the same frame.
-- Frame order: title? drawTitle : (updatePlay + drawPlay) → fade overlay
-  → `AudioSys.update(dt, danger)` → `Input.endFrame()`. dt clamped to
+- Frame order: title? (updateTitle+drawTitle) : (Esc toggles pause;
+  paused→updatePauseMenu else updatePlay; drawPlay; if paused drawPause) →
+  fade overlay → `AudioSys.update(dt, danger)` → `Input.endFrame()`. dt clamped to
   ≤ 1/30 (headless Chromium runs rAF at ~120 fps — physics are dt-true).
 - Audio autoplay: a dedicated `window` keydown listener calls
   `AudioSys.init()` (+ resume if suspended); title exit also requires

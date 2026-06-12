@@ -43,8 +43,10 @@ function makeWorld() {
   sb.window = sb; sb.globalThis = sb;
   vm.createContext(sb);
   const root = path.join(__dirname, '..');
-  for (const f of ['util', 'audio', 'player', 'entities', 'render', 'levels1', 'levels2', 'game'])
+  for (const f of ['util', 'audio', 'player', 'entities', 'render', 'levels1', 'levels2'])
     vm.runInContext(fs.readFileSync(path.join(root, 'js', f + '.js'), 'utf8'), sb, { filename: f });
+  vm.runInContext(fs.readFileSync(path.join(__dirname, 'testmap.js'), 'utf8'), sb, { filename: 'testmap.js' });
+  vm.runInContext(fs.readFileSync(path.join(root, 'js', 'game.js'), 'utf8'), sb, { filename: 'game.js' });
   vm.runInContext('globalThis.__T = { Input, Game, rectHitsSolidTiles, aabb, TILE };', sb);
   return { sb, listeners };
 }

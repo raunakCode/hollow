@@ -1,6 +1,120 @@
 # HOLLOW — status
 
-_Last updated: 2026-06-12 (session 5)._
+_Last updated: 2026-06-12 (session 8)._
+
+## Session 8 — T2/T3/T4 signed off; T6 (Ch.1 THE FOREST) built
+
+User confirmed the test-map feel/audio pass ("tested, works fine"), so the
+long-standing human sign-off on **T2, T3, T4** is in — all three checked off.
+Then built **Chapter 1**.
+
+- **Crouch now shrinks the collision box (new engine feature).** The collider
+  was a fixed 42px tall — crouch only changed speed, so "squeeze under a gap"
+  (a core Ch.1 beat) was impossible. Added `STAND_H=42`/`CROUCH_H=25` and a
+  feet-anchored resize in `updateHumanoid` (`player.js`): while you hold ↓ on
+  the ground the box shrinks to 25px (fits a 1-tile/32px gap); you also **can't
+  stand up under a ceiling** (a headroom test vs tiles AND solids forces you to
+  stay crouched until you clear the log/fence). Mantle/water paths are
+  unaffected (they're airborne/in-water, where crouch is always false). Render
+  was already feet+state-anchored, so the figure draws correctly with no change.
+- **Hint captions render now** (the last open T4 item). `Render.hint` draws a
+  faint serif key-glyph; `game.js` fades each hint's alpha in/out by player
+  proximity to its radius. Used for ↑ / ↓ / X in Ch.1.
+- **Ch.1 — THE FOREST** in `js/levels1.js` (165×24, no lethal hazards, pure
+  traversal teaching): start + grass → step-up stones (jump) → 3-tile rock wall
+  (mantle) → fallen hollow log, 3 thick with a 1-tile gap (crouch-under) → box
+  stuck in mud, push it to the 4-tile cliff and climb box+jump+mantle →
+  checkpoint on the plateau → gentle descent → long quiet walk (facility glow
+  on the horizon) → crouch under the fence → exit. One checkpoint only (the
+  chapter is death-free, so it's purely the save/continue anchor) — dropped an
+  earlier redundant second checkpoint that just bracketed the quiet walk.
+- **TEST GROUNDS relocated to `dev/testmap.js`** (dev-only). The three
+  harnesses (headless/fuzz/t5) load it *after* levels2 and *before* game.js so
+  it replaces `LEVELS` with the all-mechanics sheet (they're coupled to its
+  geometry); the real game's `LEVELS[0]` is now Ch.1. `dev/browser-test.js`
+  drives the real game (Ch.1) and now whitelists the expected file:// audio
+  fetch fallbacks instead of failing on them.
+- **Verified:** `node dev/headless.js` ALL PASS, `node dev/t5.js` ALL PASS,
+  `node dev/fuzz.js` FUZZ CLEAN, **`node dev/ch1.js` ALL PASS** (16 checks:
+  stone-hop+rock-mantle run, crouch shrink/restore, crouch under the log,
+  forced-crouch-no-headroom, box push, bare 4-tile cliff fails, box-assisted
+  climb succeeds, crouch under the fence, exit → chapter ends), and
+  `node dev/browser-test.js` BROWSER SMOKE PASS (Ch.1 boots clean from
+  file://, 124fps, 0 unexpected console errors).
+- **Still needs the user (Ch.1 hand sign-off):** play THE FOREST start to
+  finish — does the teaching read without text (terrain telegraphs jump /
+  mantle / crouch), is the box→cliff "stop and think" beat satisfying, does the
+  log/fence crouch feel right and not fiddly, and does the quiet-walk pacing +
+  rain/glow land? Machine-verified ≠ feel-verified.
+
+## Session 7 — T5 engine extras (all implemented + verified)
+
+Built every item in T5 and a focused harness for them; also fixed a real
+non-determinism bug in the test suite along the way.
+
+- **`light.offWhen`** (signal or list of signals): while any listed signal
+  is active the cone powers down — no detection, dimmed in render
+  (`render.js` lightCone alpha 0.012 when `disabled`). `updateLights`
+  evaluates signals and sets `Lt.disabled`; detection decays while off.
+- **Breath timer** (`game.js updatePlay`): `BREATH_MAX=9`, `BREATH_WARN=4`.
+  Drains while head underwater (`headInWater`), refills 4×/s at the surface
+  with a `gasp()` when crossing back above the warn line. Hitting 0 → drown
+  death. View closes to a shrinking porthole (`drawPlay` darkness mask) as
+  air runs low — no HUD bar. Breath danger also feeds the heartbeat.
+- **Scripted chase trigger** (new `trigger` entity in `entities.js` +
+  `updateTriggers`): an AABB zone with `action` (`'charge'`/`'wake'`),
+  `target` (creature index), one-shot by default. Refactored the inner
+  charge starter to module-scope `creatureStartCharge(c, px)` so triggers
+  and the alert state share it. For ch. 7D's finale.
+- **Pause menu** (Esc): freezes play, cursor over resume / restart
+  (→`resetChapterState`) / mute. **M** is a global mute key in play.
+  `Input` gained `menuUp/menuDown/menuConfirm/escPressed` (navigation kept
+  disjoint from confirm so a single key can't both move and select).
+- **Title menu**: continue / new game when a save exists, else "press any
+  key". Gated until the boot fade half-clears.
+
+- **Determinism fix (the surprise).** Adding a light shifted the "deterministic"
+  fuzz suite and occasionally surfaced a latent box/door embed — because
+  `spawnEntities` actually used **unseeded `Math.random()`** for light phase
+  and creature timers, so the suite was never truly deterministic. Changed
+  `spawnEntities(defs, seed)` to seed a `makeRng` from the chapter seed, gave
+  each creature its own seeded `rng`, and routed all spawn/runtime randomness
+  through it. After the fix: headless 65/65, fuzz clean **and** identical
+  across repeated runs.
+- **Latent embed, documented not chased.** The rare box/door embed (~col 55,
+  player pinned against a wall as a box glides in) is **pre-existing** (the
+  known soft spot noted in the round-1 "stuck" investigation below) and is
+  out of T5 scope. Reproduced only via deliberate RNG perturbation; baseline
+  is clean. Leaving it flagged here rather than claiming a fix.
+- **Verified:** `node dev/headless.js` ALL PASS, `node dev/t5.js` ALL PASS
+  (offWhen string+list, trigger charge+one-shot, breath drain/refill/drown/
+  respawn, Esc pause freeze/cursor/mute, M-key mute, title continue/new),
+  `node dev/fuzz.js` FUZZ CLEAN. Visuals checked in-browser over a local
+  http server (`dev/t5-visual.js`): zero console errors (file:// only shows
+  the expected recorded-audio fetch fallbacks).
+
+## Session 6 — "under the ground near doors" (the ACTUAL cause, finally)
+
+User reported it again with a screenshot: standing next to a door-pillar
+(box-like shape to the right) the figure reads as sunk to the ankle.
+Reproduced exactly next to door 0 (col 55, box B beside it) and door 1
+(col 83) — the user's crop matches door 0 pixel-for-pixel.
+
+- **Sessions 4–5 were right that collision is clean and wrong that it was
+  purely an illusion.** Pixel-probed again: feet endpoint = `p.y+p.h` =
+  ground top, zero penetration. BUT the legs are stroked with
+  `lineCap='round'`, so the rounded *toe* extends half a line-width
+  (~3.5px for the rim pass, lineWidth 4.5+2.6) **below** the foot
+  endpoint — i.e. ~3.5px under the bright ground lip. That overshoot is
+  the sink. It's universal, but only *reads* as sunk next to a tall dark
+  door/box that gives the eye a vertical reference and a crisp floor lip.
+- **Fix** (`render.js humanoid()`): clamp both drawn foot endpoints up by
+  the rim cap radius (`footCap = (4.5+2.6)/2`) so the rounded toe rests ON
+  the floor line instead of poking through it. Purely visual; physics
+  untouched. Verified with brightened 3× zoom crops at door 0/1: feet now
+  sit on the same contact line as the adjacent box.
+- **Verified:** `node dev/headless.js` ALL PASS, `node dev/fuzz.js` 8
+  seeds clean.
 
 ## Session 5 — "stuck in ground" (real cause found) + water-audio question
 

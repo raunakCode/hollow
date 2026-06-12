@@ -5,6 +5,8 @@
 
 const GRAVITY = 1900;
 const MAX_FALL = 900;
+const STAND_H = 42;   // standing collision height
+const CROUCH_H = 25;  // crouched height — fits under a 1-tile (32px) gap
 
 // --- tile queries (level.rows = array of strings) ---
 function tileAt(level, tx, ty) {
@@ -160,7 +162,7 @@ function waterSurfaceY(level, x) {
 // ----------------------------------------------------------------
 function makeHumanoid(x, y) {
   return {
-    x, y, w: 18, h: 42, vx: 0, vy: 0,
+    x, y, w: 18, h: STAND_H, vx: 0, vy: 0,
     facing: 1, grounded: false, inWater: false, crouch: false,
     runPhase: 0, airTime: 0, coyote: 0, jumpBuf: 0,
     mantle: null,        // {t, fromX, fromY, toX, toY}
@@ -187,7 +189,28 @@ function updateHumanoid(p, ctl, dt, level, solids, sounds) {
   }
 
   p.inWater = centerInWater(level, p);
-  p.crouch = !!(ctl.down && p.grounded && !p.inWater);
+  // Crouch shrinks the collision box (feet-anchored) so you can squeeze under
+  // a 1-tile gap. You stay crouched while holding ↓ on the ground; you also
+  // CAN'T stand back up if a ceiling is directly overhead (under a log/fence),
+  // so releasing ↓ in a tight gap keeps you crouched until you clear it.
+  const wantCrouch = !!(ctl.down && p.grounded && !p.inWater);
+  let crouch = wantCrouch;
+  if (!wantCrouch && p.h < STAND_H) {
+    const grownY = (p.y + p.h) - STAND_H;
+    let blocked = rectHitsSolidTiles(level, p.x, grownY, p.w, STAND_H);
+    if (!blocked) {
+      const grown = { x: p.x, y: grownY, w: p.w, h: STAND_H };
+      for (const s of solids) if (aabb(grown, s)) { blocked = true; break; }
+    }
+    if (blocked) crouch = true;   // no headroom — forced to stay down
+  }
+  p.crouch = crouch;
+  const targetH = crouch ? CROUCH_H : STAND_H;
+  if (targetH !== p.h) {           // resize anchored at the feet
+    const feet = p.y + p.h;
+    p.h = targetH;
+    p.y = feet - targetH;
+  }
 
   const accel = p.inWater ? 600 : (p.grounded ? 1700 : 1100);
   const maxSpd = p.inWater ? 130 : (p.crouch ? 80 : (p.grabbing ? 90 : 215));

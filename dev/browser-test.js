@@ -30,8 +30,12 @@ const URL = 'file://' + path.join(__dirname, '..', 'index.html');
   const browser = await chromium.launch({ executablePath: EXE, headless: true });
   const page = await browser.newPage({ viewport: { width: 960, height: 540 } });
   const errors = [];
-  page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
-  page.on('pageerror', e => errors.push(String(e)));
+  // On file:// the recorded audio samples can't be fetched and each silently
+  // falls back to synth (documented in CLAUDE.md / STATUS). Those fetch
+  // messages are expected, not real errors — filter them out.
+  const expected = m => /Fetch API cannot load .*assets\/audio\/.*scheme "file"/.test(m);
+  page.on('console', m => { if (m.type() === 'error' && !expected(m.text())) errors.push(m.text()); });
+  page.on('pageerror', e => { if (!expected(String(e))) errors.push(String(e)); });
 
   await page.goto(URL);
   await page.waitForTimeout(1500);

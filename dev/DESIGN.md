@@ -42,8 +42,9 @@ once triggered (use after puzzles so death-reset can't strand the player).
 **Searchlights**: sweeping cones. Detection fills in ~0.4 s, then a dart
 kills you. Blocked by tiles, boxes, and closed doors. Crouching in grass
 ('G' tiles) makes you invisible. **Lights ignore husks** — that asymmetry is
-a core puzzle tool. (Engine TODO: lights need optional `offWhen: [ids]` to be
-disabled by signals.)
+a core puzzle tool. Lights take an optional `offWhen` (a signal id or list of
+ids): while any listed signal is active the cone powers down — no detection,
+dimmed in render (implemented T5).
 
 **Husks + helms**: stand at a helm, press X/E: you slump and *every husk in
 the chapter mirrors your directional input simultaneously*. Disconnect and
@@ -60,8 +61,9 @@ each weigh 1. Brain food: getting weight onto the far side, riding while
 balanced, using a husk as a remote-controlled counterweight.
 
 **Water**: swim freely; can only jump out near the surface. Breath: ~9 s of
-head-underwater, then death (Engine TODO: breath timer + a subtle screen
-darkening as it runs out — no HUD bar). Boxes float; husks swim when mirrored.
+head-underwater, then drowning death; the view closes to a shrinking porthole
+as it runs out (no HUD bar) and refills fast at the surface with a gasp
+(implemented T5). Boxes float; husks swim when mirrored.
 
 **The Listener (creature)**: cavern predator. Cycle: dormant (eye dark,
 2.5–4.5 s) → waking growl (0.8 s warning) → alert (eye glowing, 1.8–3.6 s) →
@@ -159,7 +161,8 @@ with two Listeners on overlapping cycles; grass patches mark safe waiting
 spots (flavor only — stillness is what saves you). C: pool crossing with a
 Listener on the far shore: float motionless when the eye opens (vertical
 drift is allowed, strokes are not). D: scripted finale: a long charge — sprint
-right and slide under a closing door (engine TODO: scripted chase trigger).
+right and slide under a closing door. Use a `trigger` zone (action `'charge'`)
+to fire the scripted lunge as the player crosses the threshold (implemented T5).
 Generous checkpoints (every segment).
 
 ### Ch. 8 — THE CORE (everything; interior bg, strange warm glow)
@@ -173,11 +176,11 @@ cinematic state). After credits: "press R" → title.
 
 ## Engine features still needed (referenced above)
 
-- `light.offWhen: [ids]` — signals disable a searchlight.
-- Breath timer + drowning + screen-darkening tell.
-- Scripted chase trigger (ch. 7D) — a zone that forces a long charge.
-- Ending cinematic state (ch. 8) + credits.
-- Save/continue, pause menu, title screen.
+- ~~`light.offWhen: [ids]` — signals disable a searchlight.~~ done (T5)
+- ~~Breath timer + drowning + screen-darkening tell.~~ done (T5)
+- ~~Scripted chase trigger (ch. 7D) — a zone that forces a long charge.~~ done (T5: `trigger` entity)
+- Ending cinematic state (ch. 8) + credits. *(T13)*
+- ~~Save/continue, pause menu, title screen.~~ done (T3 save + T5 pause/title menus)
 
 ## Difficulty / pacing principles
 

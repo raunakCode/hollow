@@ -89,10 +89,15 @@ sandbox.globalThis = sandbox;
 vm.createContext(sandbox);
 
 const root = path.join(__dirname, '..');
-for (const f of ['util', 'audio', 'player', 'entities', 'render', 'levels1', 'levels2', 'game']) {
+for (const f of ['util', 'audio', 'player', 'entities', 'render', 'levels1', 'levels2']) {
   const file = path.join(root, 'js', f + '.js');
   vm.runInContext(fs.readFileSync(file, 'utf8'), sandbox, { filename: file });
 }
+// dev-only: swap in the TEST GROUNDS mechanics map before game.boot() runs
+const tmFile = path.join(__dirname, 'testmap.js');
+vm.runInContext(fs.readFileSync(tmFile, 'utf8'), sandbox, { filename: tmFile });
+const gameFile = path.join(root, 'js', 'game.js');
+vm.runInContext(fs.readFileSync(gameFile, 'utf8'), sandbox, { filename: gameFile });
 // expose top-level lexical bindings to the harness
 vm.runInContext('globalThis.__T = { Input, Game, LEVELS, AudioSys, TILE };', sandbox);
 const { Input, Game, LEVELS, TILE } = sandbox.__T;

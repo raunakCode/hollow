@@ -4,12 +4,15 @@
 'use strict';
 
 // Build the runtime world from a chapter's entity definitions (tile coords)
-function spawnEntities(defs) {
+function spawnEntities(defs, seed) {
   const w = {
     boxes: [], doors: [], levers: [], plates: [], lights: [],
     husks: [], helms: [], lifts: [], creatures: [], checks: [],
-    exits: [], hints: [],
+    exits: [], hints: [], triggers: [],
   };
+  // Seeded so spawn (light phase, creature timer) is deterministic — same
+  // chapter always boots identically and the dev harnesses are reproducible.
+  const rand = makeRng((seed || 1) >>> 0);
   for (const d of defs) {
     const px = d.x * TILE, py = d.y * TILE;
     switch (d.t) {
@@ -36,7 +39,8 @@ function spawnEntities(defs) {
         w.lights.push({
           x: px + TILE / 2, y: py + TILE / 2, a0: d.a0, a1: d.a1,
           speed: d.speed || 0.5, phase: d.phase || 0, len: (d.len || 11) * TILE,
-          fov: d.fov || 0.30, ang: d.a0, detect: 0, t: Math.random() * 10, tick: 0,
+          fov: d.fov || 0.30, ang: d.a0, detect: 0, t: rand() * 10, tick: 0,
+          offWhen: d.offWhen || null, disabled: false,
         });
         break;
       case 'husk': {
@@ -59,8 +63,9 @@ function spawnEntities(defs) {
       case 'creature':
         w.creatures.push({
           x: px, y: py - 26, w: 86, h: 58, homeX: px, vx: 0,
-          state: 'dormant', timer: 1.5 + Math.random() * 2, eye: 0,
+          state: 'dormant', timer: 1.5 + rand() * 2, eye: 0,
           range: (d.range || 15) * TILE, chargeDir: 0,
+          rng: makeRng((rand() * 4294967296) >>> 0),   // own stream for state timers
         });
         break;
       case 'check':
@@ -71,6 +76,16 @@ function spawnEntities(defs) {
         break;
       case 'hint':
         w.hints.push({ x: px, y: py, text: d.text, r: (d.r || 5) * TILE, alpha: 0 });
+        break;
+      case 'trigger':
+        // A scripted zone: when the player first enters, it acts on a
+        // creature (index `target`). 'charge' forces an immediate lunge
+        // toward the player (the chase scare); 'wake' just opens its eye.
+        w.triggers.push({
+          x: px, y: py, w: (d.w || 2) * TILE, h: (d.h || 4) * TILE,
+          action: d.action || 'charge', target: d.target == null ? 0 : d.target,
+          once: d.once !== false, fired: false,
+        });
         break;
     }
   }
@@ -186,10 +201,17 @@ function updateLifts(world, dt, heavies) {
 function updateLights(world, level, player, hidden, dt) {
   let maxDanger = 0;
   let killed = false;
+  const sig = evalSignals(world);
   for (const Lt of world.lights) {
     Lt.t += dt;
     const k = (Math.sin(Lt.t * Lt.speed * Math.PI * 2 + Lt.phase) + 1) / 2;
     Lt.ang = lerp(Lt.a0, Lt.a1, k);
+    // a signal can cut the power: the cone keeps sweeping (so it's in
+    // position when re-energised) but sees nothing and dims in render.
+    // offWhen may be one id or a list — disabled if ANY listed signal is on.
+    Lt.disabled = !!(Lt.offWhen && (Array.isArray(Lt.offWhen)
+      ? Lt.offWhen.some(id => sig[id]) : sig[Lt.offWhen]));
+    if (Lt.disabled) { Lt.detect = Math.max(0, Lt.detect - dt * 3); continue; }
     // detect player
     const pcx = player.x + player.w / 2, pcy = player.y + player.h / 2;
     const dx = pcx - Lt.x, dy = pcy - Lt.y;
@@ -253,14 +275,14 @@ function updateCreatures(world, level, player, dt) {
         // noise threshold, so charging earlier makes the tell a lie
         c.eye = damp(c.eye, 1, 5, dt);
         if (c.timer <= 0) {
-          c.state = 'alert'; c.timer = 1.8 + Math.random() * 1.8;
+          c.state = 'alert'; c.timer = 1.8 + c.rng() * 1.8;
           if (near) AudioSys.creatureOpen();
         }
         break;
       case 'alert':
         c.eye = 1;
-        if (near && playerNoisy) startCharge(c, pcx);
-        if (c.timer <= 0) { c.state = 'dormant'; c.timer = 2.2 + Math.random() * 2.2; }
+        if (near && playerNoisy) creatureStartCharge(c, pcx);
+        if (c.timer <= 0) { c.state = 'dormant'; c.timer = 2.2 + c.rng() * 2.2; }
         break;
       case 'charge': {
         c.vx = damp(c.vx, c.chargeDir * 560, 8, dt);
@@ -281,20 +303,41 @@ function updateCreatures(world, level, player, dt) {
       case 'return':
         c.eye = damp(c.eye, 0, 3, dt);
         c.x = damp(c.x, c.homeX, 1.2, dt);
-        if (Math.abs(c.x - c.homeX) < 6) { c.state = 'dormant'; c.timer = 2.5 + Math.random() * 2; }
+        if (Math.abs(c.x - c.homeX) < 6) { c.state = 'dormant'; c.timer = 2.5 + c.rng() * 2; }
         break;
     }
     if (near && c.eye > 0.4 && c.state !== 'return') maxDanger = Math.max(maxDanger, c.eye * 0.85);
     if (c.state === 'charge') maxDanger = 1;
   }
   return { killed, danger: maxDanger };
+}
 
-  function startCharge(c, px) {
-    c.state = 'charge';
-    c.chargeDir = px > c.x + c.w / 2 ? 1 : -1;
-    c.targetX = px;
-    c.timer = 2.2;
-    c.vx = c.chargeDir * 120;
-    AudioSys.creatureGrowl();
+// Force a creature into an immediate lunge toward world-x `px`. Shared by
+// the natural alert→charge path and scripted trigger zones.
+function creatureStartCharge(c, px) {
+  c.state = 'charge';
+  c.chargeDir = px > c.x + c.w / 2 ? 1 : -1;
+  c.targetX = px;
+  c.timer = 2.2;
+  c.vx = c.chargeDir * 120;
+  AudioSys.creatureGrowl();
+}
+
+// Scripted chase zones: fire once when the player enters, acting on a
+// creature. Returns nothing; mutates world.creatures.
+function updateTriggers(world, player) {
+  for (const z of world.triggers) {
+    const inside = aabb(z, player);
+    if (!inside) { if (!z.once) z.fired = false; continue; }
+    if (z.fired) continue;
+    z.fired = true;
+    const c = world.creatures[z.target];
+    if (!c) continue;
+    if (z.action === 'charge') {
+      creatureStartCharge(c, player.x + player.w / 2);
+    } else if (z.action === 'wake') {
+      c.state = 'waking'; c.timer = 0.8; c.eye = Math.max(c.eye, 0.01);
+      AudioSys.creatureGrowl();
+    }
   }
 }

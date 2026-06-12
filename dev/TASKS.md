@@ -18,7 +18,7 @@ in part of one session; doing several per session is expected and fine.
   ✓ Game opens from file://, character runs/jumps/mantles/swims/crouches,
   camera follows, no console errors, 60 fps.
 
-- [ ] **T2. Feel pass + box interaction.** Tune jump/run/mantle until they
+- [x] **T2. Feel pass + box interaction.** Tune jump/run/mantle until they
   feel weighty (INSIDE-slow, deliberate). Implement push (player hitX → box
   ref) and grab/pull (hold X/E), box-on-plate stacking, floating box you can
   stand on. Add a box + plate + door to the test map.
@@ -27,7 +27,7 @@ in part of one session; doing several per session is expected and fine.
 
 ## Milestone 2 — all systems live
 
-- [ ] **T3. Interactive systems wiring.** In game.js: levers (act near →
+- [x] **T3. Interactive systems wiring.** In game.js: levers (act near →
   toggle), doors/plates/lifts updates in correct order, helm
   connect/disconnect with input routed to all husks + camera on husk
   centroid, light detection → death, creature → death, hidden = crouch in
@@ -36,7 +36,7 @@ in part of one session; doing several per session is expected and fine.
   ✓ Each mechanic demonstrably works in the test map; dying resets boxes but
   respawns you at the checkpoint; reload resumes from save.
 
-- [ ] **T4. Entity rendering + dark mode.** Render methods for: boxes
+- [x] **T4. Entity rendering + dark mode.** Render methods for: boxes
   (silhouette crates), doors (sliding slabs + groan), levers, plates (sink
   visually), light cones (soft gradient, brighten on detection) + fixtures,
   helms (hanging cable + faint glow), lifts (platforms + rope lines),
@@ -45,11 +45,12 @@ in part of one session; doing several per session is expected and fine.
   by proximity). Darkness mask wired (player glow, creature eyes, helms).
   ✓ Test map readable at a glance; dark room playable by player glow alone.
 
-- [ ] **T5. Engine extras.** `light.offWhen` signal-disable; breath timer
+- [x] **T5. Engine extras.** `light.offWhen` signal-disable; breath timer
   (~9 s, screen darkens, drown death); scripted chase trigger zone; heartbeat
   danger wiring (`AudioSys.update`); pause menu (Esc: resume/restart/mute);
   title screen with HOLLOW wordmark + "press any key" + continue-from-save.
-  ✓ All verified in test map / title flow.
+  ✓ All verified in test map / title flow. (Done session 7; dev/t5.js +
+  dev/t5-visual.js cover them. Also fixed spawn non-determinism — see STATUS.)
 
 ## Milestone 3 — the game (one chapter ≈ one task)
 
@@ -57,7 +58,12 @@ Each chapter task: build the map + entities per `dev/DESIGN.md`, hand-verify
 every puzzle is solvable *and* not bypassable, place checkpoints per the
 death-reset rule, set palette/mood/bg, playtest start-to-finish twice.
 
-- [ ] **T6. Ch. 1 — THE FOREST** (tutorial; replaces test map).
+- [x] **T6. Ch. 1 — THE FOREST** (tutorial; replaces test map). Built + verified
+  session 8. Teaches jump (step stones) → mantle (3-tile rock) → crouch-under
+  (fallen log) → box-push + 4-tile cliff climb → checkpoint → quiet walk →
+  crouch under the fence → exit. Added crouch collision-shrink (the engine had
+  none) so squeeze-under-gaps works. Test map moved to dev/testmap.js; new
+  dev/ch1.js walks the whole chapter. See STATUS.
 - [ ] **T7. Ch. 2 — THE FENCE** (searchlights).
 - [ ] **T8. Ch. 3 — THE YARD** (boxes/plates/lift intro).
 - [ ] **T9. Ch. 4 — THE DRAINS** (water/breath).
@@ -81,3 +87,5 @@ death-reset rule, set palette/mood/bg, playtest start-to-finish twice.
 - 2026-06-11 — T1 done: game.js + test map + node/browser smoke tests (dev/headless.js, dev/browser-test.js) — all green, 0 console errors.
 - 2026-06-11 — T2 mechanics: push/grab-pull, mantle climb cap (4-tile walls now box-only), rider-eject fix, T2 gauntlet in test map — 30 assertions green; T2 left unchecked pending human feel/audio pass (see STATUS).
 - 2026-06-11 — T3 systems (levers/doors/lights/helm-husks/lifts/Listener/save) + most of T4 entity rendering + round-2 audio/visual fixes (sessions 2–3). Session 3 fixed the lift geometry (independent aw/bw widths, widened pit B), the Listener charge test, and box buoyancy (spring-to-surface) — headless 65/65, fuzz 8-seed clean, browser clean. T3/T4 left unchecked pending human feel/audio sign-off (see STATUS).
+- 2026-06-12 — T5 done: light.offWhen, breath/drown + porthole, scripted chase trigger, pause menu, title continue/new-game, M-mute. Fixed spawnEntities non-determinism (seeded RNG + per-creature rng). New dev/t5.js + dev/t5-visual.js. headless ALL PASS, t5 ALL PASS, fuzz CLEAN, browser clean over http.
+- 2026-06-12 — T2/T3/T4 signed off by user (test-map feel/audio pass). T6 done: Ch.1 THE FOREST built. Added crouch collision-shrink (CROUCH_H, feet-anchored + ceiling check) + hint caption rendering (was the last T4 TODO). Moved TEST GROUNDS to dev/testmap.js (harnesses load it before game.js; real LEVELS[0] is now Ch.1). New dev/ch1.js (16 checks, ALL PASS). headless/t5 ALL PASS, fuzz CLEAN, browser smoke PASS (whitelisted the expected file:// audio fallbacks).

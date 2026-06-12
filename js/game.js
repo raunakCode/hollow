@@ -20,7 +20,14 @@ const Game = {
   last: 0,
   helmed: null,              // helm ref while connected (input routes to husks)
   checkpointIdx: -1,         // last checkpoint reached; -1 = playerStart
+  breath: 0,                 // seconds of air left underwater (BREATH_MAX = full)
+  paused: false,
+  pauseSel: 0,               // 0 resume | 1 restart | 2 mute
+  titleSel: 0,               // 0 continue | 1 new game (when a save exists)
 };
+
+const BREATH_MAX = 9;        // seconds the player can hold their breath
+const BREATH_WARN = 4;       // below this the screen starts closing in
 
 // --------------------------- save / load ----------------------------
 
@@ -62,7 +69,7 @@ function loadChapter(i, checkpointIdx) {
 // entire chapter's entity state — see DESIGN.md), but you respawn at
 // the last checkpoint reached. Reached checkpoints stay reached.
 function resetChapterState() {
-  Game.world = spawnEntities(Game.chapter.entities);
+  Game.world = spawnEntities(Game.chapter.entities, Game.chapter.seed);
   Game.helmed = null;
   let sx = Game.chapter.playerStart[0] * TILE + (TILE - 18) / 2;
   let sy = (Game.chapter.playerStart[1] + 1) * TILE - 42;
@@ -77,6 +84,8 @@ function resetChapterState() {
   }
   Game.player = makeHumanoid(sx, sy);
   Game.danger = 0;
+  Game.breath = BREATH_MAX;
+  Game.paused = false;
   updateCamera(0, true);
 }
 
@@ -129,6 +138,7 @@ function updatePlay(dt) {
   const p = Game.player, level = Game.level, world = Game.world;
 
   if (Input.pressed['KeyR']) { die(false); return; }
+  if (Input.pressed['KeyM']) AudioSys.toggleMute();
 
   const ctl = {
     left: Input.left(), right: Input.right(),
@@ -173,9 +183,23 @@ function updatePlay(dt) {
   const ctx2 = Math.floor((p.x + p.w / 2) / TILE);
   const feetTy = Math.floor((p.y + p.h - 4) / TILE);
   const hidden = p.crouch && isGrassTile(tileAt(level, ctx2, feetTy));
+  updateTriggers(world, p);
   const li = updateLights(world, level, p, hidden, dt);
   const cr = updateCreatures(world, level, p, dt);
-  Game.danger = Math.max(li.danger, cr.danger);
+
+  // breath: drains while the head is submerged, refills fast at the surface.
+  // Run dry -> drown. (Husks don't breathe — only the controlled body does.)
+  if (headInWater(level, p)) {
+    Game.breath -= dt;
+    if (Game.breath <= 0) { Game.breath = 0; die(true); return; }
+  } else if (Game.breath < BREATH_MAX) {
+    const wasLow = Game.breath < BREATH_WARN;
+    Game.breath = Math.min(BREATH_MAX, Game.breath + dt * 4);
+    if (wasLow && Game.breath >= BREATH_WARN) AudioSys.gasp();
+  }
+  const breathDanger = clamp((BREATH_WARN - Game.breath) / BREATH_WARN, 0, 1);
+
+  Game.danger = Math.max(li.danger, cr.danger, breathDanger * 0.9);
   if (li.killed || cr.killed) { die(true); return; }
 
   for (const c of world.checks) {
@@ -188,6 +212,14 @@ function updatePlay(dt) {
   }
   for (const hm of world.helms)
     hm.glow = damp(hm.glow, Game.helmed === hm ? 1 : 0.3, 4, dt);
+
+  // hint captions: fade in when the player is within the hint's radius,
+  // fade back out as they walk on. Pure proximity, no triggers.
+  for (const ht of world.hints) {
+    const d = Math.hypot((p.x + p.w / 2) - ht.x, (p.y + p.h / 2) - ht.y);
+    const near = d < ht.r ? clamp(1 - d / ht.r, 0, 1) : 0;
+    ht.alpha = damp(ht.alpha, near, 3, dt);
+  }
 
   // ambient water bed: full volume when submerged, fading out within ~6 tiles
   // of the nearest water. (No-op until the recorded loop loads.)
@@ -344,6 +376,7 @@ function drawPlay(dt) {
   for (const h of Game.world.husks)
     Render.humanoid(ctx, h, cam, { huskGlow: true, connected: !!Game.helmed });
   Render.humanoid(ctx, Game.player, cam, {});
+  for (const ht of Game.world.hints) Render.hint(ctx, ht, cam);
   for (const Lt of Game.world.lights) Render.lightCone(ctx, Lt, cam);
   if (ch.dark) {
     const p = Game.player;
@@ -353,8 +386,41 @@ function drawPlay(dt) {
   }
   if (ch.rain) Render.rainPass(ctx, dt, cam);
   else Render.motesPass(ctx, dt, Game.time);
+  // drowning: the view closes to a shrinking porthole as breath runs out
+  if (Game.breath < BREATH_WARN) {
+    const p = Game.player;
+    const k = clamp((BREATH_WARN - Game.breath) / BREATH_WARN, 0, 1);
+    Render.darkness(ctx, k * 0.92, [
+      { x: p.x + p.w / 2 - cam.x, y: p.y + p.h / 2 - cam.y, r: lerp(240, 70, k), a: 0.95 },
+    ]);
+  }
   Render.vignette(ctx);
   Render.grainPass(ctx);
+}
+
+// Title: a HOLLOW/New-Game choice when a save exists, else "press any key".
+// The boot keypress can't skip it (gated on the fade half-clearing).
+function updateTitle() {
+  if (Game.fadeV > 0 || Game.fade >= 0.5) return;
+  const sv = loadSave();
+  const begin = () => fadeOutThen(1.6, () => {
+    const newGame = !sv || Game.titleSel === 1;
+    if (newGame) {
+      try { localStorage.removeItem(SAVE_KEY); } catch (e) { /* ok */ }
+      loadChapter(0);
+    } else if (sv.chapter !== Game.chapterIdx || sv.checkpointIdx !== Game.checkpointIdx) {
+      loadChapter(sv.chapter, sv.checkpointIdx);
+    }
+    AudioSys.setMood(Game.chapter.mood);
+    Game.state = 'play';
+  });
+  if (sv) {
+    if (Input.menuUp() || Input.menuDown()) Game.titleSel ^= 1;
+    if (Input.menuConfirm()) begin();
+  } else {
+    Game.titleSel = 0;
+    if (Input.anyKeyThisFrame) begin();
+  }
 }
 
 function drawTitle() {
@@ -369,13 +435,56 @@ function drawTitle() {
   const x0 = VIEW_W / 2 - ((word.length - 1) * stepX) / 2;
   ctx.fillStyle = 'rgba(185,198,214,0.82)';
   for (let i = 0; i < word.length; i++) ctx.fillText(word[i], x0 + i * stepX, VIEW_H * 0.42);
-  const pulse = 0.18 + 0.10 * (Math.sin(Game.time * 1.7) + 1) / 2;
-  ctx.font = '17px Georgia, serif';
-  ctx.fillStyle = 'rgba(150,165,185,' + pulse.toFixed(3) + ')';
-  ctx.fillText('press any key', VIEW_W / 2, VIEW_H * 0.62);
+  if (loadSave()) {
+    const items = ['continue', 'new game'];
+    ctx.font = '18px Georgia, serif';
+    for (let i = 0; i < items.length; i++) {
+      const on = Game.titleSel === i;
+      ctx.fillStyle = on
+        ? 'rgba(205,216,230,' + (0.7 + 0.15 * (Math.sin(Game.time * 3) + 1) / 2).toFixed(3) + ')'
+        : 'rgba(120,135,155,0.45)';
+      ctx.fillText((on ? '› ' : '  ') + items[i], VIEW_W / 2, VIEW_H * 0.60 + i * 30);
+    }
+  } else {
+    const pulse = 0.18 + 0.10 * (Math.sin(Game.time * 1.7) + 1) / 2;
+    ctx.font = '17px Georgia, serif';
+    ctx.fillStyle = 'rgba(150,165,185,' + pulse.toFixed(3) + ')';
+    ctx.fillText('press any key', VIEW_W / 2, VIEW_H * 0.62);
+  }
   ctx.restore();
   Render.vignette(ctx);
   Render.grainPass(ctx);
+}
+
+// Esc pause: resume / restart-at-checkpoint / mute. Play is frozen while open.
+function updatePauseMenu() {
+  if (Input.menuUp()) Game.pauseSel = (Game.pauseSel + 2) % 3;
+  if (Input.menuDown()) Game.pauseSel = (Game.pauseSel + 1) % 3;
+  if (Input.menuConfirm()) {
+    if (Game.pauseSel === 0) Game.paused = false;
+    else if (Game.pauseSel === 1) resetChapterState();   // clears Game.paused
+    else AudioSys.toggleMute();
+  }
+}
+
+function drawPause() {
+  const ctx = Game.ctx;
+  ctx.fillStyle = 'rgba(2,4,7,0.72)';
+  ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = '34px Georgia, serif';
+  ctx.fillStyle = 'rgba(195,208,224,0.85)';
+  ctx.fillText('PAUSED', VIEW_W / 2, VIEW_H * 0.34);
+  const items = ['resume', 'restart', AudioSys.muted ? 'unmute' : 'mute'];
+  ctx.font = '19px Georgia, serif';
+  for (let i = 0; i < items.length; i++) {
+    const on = Game.pauseSel === i;
+    ctx.fillStyle = on ? 'rgba(210,220,234,0.92)' : 'rgba(120,135,155,0.45)';
+    ctx.fillText((on ? '› ' : '  ') + items[i], VIEW_W / 2, VIEW_H * 0.50 + i * 32);
+  }
+  ctx.restore();
 }
 
 // ---------------------------- main loop ------------------------------
@@ -387,22 +496,16 @@ function frame(ts) {
   Game.time += dt;
 
   if (Game.state === 'title') {
-    // fade < 0.5 so the keypress that booted the page can't skip a
-    // title you haven't seen yet
-    if (Input.anyKeyThisFrame && Game.fadeV === 0 && Game.fade < 0.5) {
-      fadeOutThen(1.6, () => {
-        // continue from save when one exists (proper title UI lands in T5)
-        const sv = loadSave();
-        if (sv && (sv.chapter !== Game.chapterIdx || sv.checkpointIdx !== Game.checkpointIdx))
-          loadChapter(sv.chapter, sv.checkpointIdx);
-        AudioSys.setMood(Game.chapter.mood);
-        Game.state = 'play';
-      });
-    }
+    updateTitle();
     drawTitle();
   } else {
-    if (Game.state === 'play') updatePlay(dt);
+    if (Game.state === 'play') {
+      if (Input.escPressed() && Game.fadeV === 0) Game.paused = !Game.paused;
+      if (Game.paused) updatePauseMenu();
+      else updatePlay(dt);
+    }
     drawPlay(dt);
+    if (Game.paused) drawPause();
   }
 
   if (Game.fadeV > 0) {
