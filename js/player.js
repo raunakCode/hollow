@@ -243,7 +243,9 @@ function updateHumanoid(p, ctl, dt, level, solids, sounds) {
   // total climb (water counts: you can always haul out onto a low ledge)
   if (p.grounded || p.inWater) p.jumpFromY = p.y;
 
-  if (!wasGrounded && p.grounded && wasVy > 380 && sounds) AudioSys.land();
+  // land thud only on solid ground — water cushions the impact (a thud here
+  // reads as knocking on wood, not entering water)
+  if (!wasGrounded && p.grounded && wasVy > 380 && !p.inWater && sounds) AudioSys.land();
   if (p.inWater && !centerInWater(level, { ...p, y: p.y - p.vy * dt })) { /* noop */ }
 
   // --- ledge mantle: pressing into a wall while airborne ---

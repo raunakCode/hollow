@@ -1,7 +1,9 @@
 # HOLLOW — project instructions for Claude
 
 This is **HOLLOW**, an INSIDE-style atmospheric puzzle-platformer (vanilla JS +
-canvas, no build step, must run from `file://`). Built across multiple sessions.
+canvas, no build step). Built across multiple sessions. It runs from `file://`,
+but **recorded audio requires serving over http** (`python3 -m http.server`) —
+see Hard rules. Without a server it still runs; audio falls back to synth.
 
 ## Session protocol (do this every session)
 
@@ -17,9 +19,16 @@ canvas, no build step, must run from `file://`). Built across multiple sessions.
 
 ## Hard rules
 
-- Plain `<script>` files, no ES modules, no fetch/XHR, no external assets —
-  the game must work opened directly from the filesystem. All audio is
-  synthesized in `js/audio.js`, all art is procedural canvas drawing.
+- Plain `<script>` files, no ES modules, no build step. **All art is
+  procedural canvas drawing** (no image assets — that rule stands).
+- Audio: synthesized in `js/audio.js` is the baseline and the always-working
+  fallback. **Recorded audio samples are now allowed** (deviation from the
+  original no-assets rule, session 5, at the user's request): they live in
+  `assets/audio/`, are listed in `AUDIO_SAMPLES` in `js/audio.js`, and load via
+  `fetch` + `decodeAudioData`. That means **the game must be served over http**
+  (`python3 -m http.server`) for recorded audio to play; on `file://` fetch is
+  blocked and each sample silently falls back to its synth version. Any missing
+  sample also falls back, so the game never hard-depends on an asset.
 - Load order in `index.html` matters: util → audio → player → entities →
   render → levels1 → levels2 → game.
 - `dev/DESIGN.md` is the design bible (mechanics rules, all 8 chapter designs,

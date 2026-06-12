@@ -147,12 +147,12 @@ function updatePlay(dt) {
 
   const wasInWater = p.inWater;
   updateHumanoid(p, playerCtl, dt, level, collectSolids(world, p), true);
-  if (!wasInWater && p.inWater && p.vy > 40) AudioSys.splash();
+  maybeSplash(p, wasInWater, dt);
 
   for (const h of world.husks) {
     const hWasInWater = h.inWater;
     updateHumanoid(h, huskCtl, dt, level, collectSolids(world, h), false);
-    if (!hWasInWater && h.inWater && h.vy > 40) AudioSys.splash();
+    maybeSplash(h, hWasInWater, dt);
     // husks push boxes like the player does (no grab — X/E is the helm key)
     if (Game.helmed && h.grounded && !h.inWater &&
         h.lastHitX && world.boxes.includes(h.lastHitX) &&
@@ -189,6 +189,10 @@ function updatePlay(dt) {
   for (const hm of world.helms)
     hm.glow = damp(hm.glow, Game.helmed === hm ? 1 : 0.3, 4, dt);
 
+  // ambient water bed: full volume when submerged, fading out within ~6 tiles
+  // of the nearest water. (No-op until the recorded loop loads.)
+  AudioSys.setWaterLevel(p.inWater ? 1 : waterProximity(level, p));
+
   if (Game.fadeV === 0) {
     for (const ex of world.exits) {
       if (aabb(p, ex)) {
@@ -207,6 +211,40 @@ function updatePlay(dt) {
   }
 
   updateCamera(dt, false);
+}
+
+// Fire the entry splash, but only on a real plunge. `inWater` is center-in-tile,
+// so a swimmer bobbing at the surface flickers it on/off every few frames; the
+// old cooldown alone still let it retrigger. We require the entity to have been
+// CLEAR of the water for a beat first (`dryTime`) — a bob's out-interval is far
+// shorter than that, so surface bobbing is silent while a genuine fall still
+// splashes. Tracks dryTime per entity (player + husks).
+function maybeSplash(ent, wasInWater, dt) {
+  ent.splashCd = Math.max(0, (ent.splashCd || 0) - dt);
+  if (!wasInWater && ent.inWater && (ent.dryTime || 0) > 0.4 &&
+      ent.vy > 12 && ent.splashCd <= 0) {
+    AudioSys.splash();
+    ent.splashCd = 0.6;
+  }
+  ent.dryTime = ent.inWater ? 0 : (ent.dryTime || 0) + dt;
+}
+
+// 0..1 nearness of the player to water: scans columns within ±RANGE tiles for
+// a water surface and maps the closest one's distance to a fade. Cheap (a few
+// dozen waterSurfaceY probes) and only runs when not already submerged.
+function waterProximity(level, p) {
+  const RANGE = 7;
+  const cx = Math.floor((p.x + p.w / 2) / TILE);
+  const py = p.y + p.h / 2;
+  let best = Infinity;
+  for (let dx = -RANGE; dx <= RANGE; dx++) {
+    const sy = waterSurfaceY(level, (cx + dx) * TILE + TILE / 2);
+    if (sy == null) continue;
+    const d = Math.hypot(dx * TILE, py - sy) / TILE;
+    if (d < best) best = d;
+  }
+  if (best === Infinity) return 0;
+  return clamp(1 - best / RANGE, 0, 1);
 }
 
 // X/E pressed: helm has priority, then levers. Reach is the player's

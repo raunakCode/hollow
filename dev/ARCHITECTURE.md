@@ -75,11 +75,20 @@ Game.js should derive `level = { w, h, rows }` from this (`w` = row length,
 call `Input.endFrame()` at end of each frame. `fitCanvas(canvas)` once.
 
 ### audio.js (AudioSys)
-`init()` (must be inside a user-gesture handler), `toggleMute()`,
-`setMood({drone,wind,rain,pitch})`, `update(dt, dangerLevel)` every frame
-(drives heartbeat). One-shots: `step jump land splash boxDrag lever doorMove
-connect disconnect detectTick alarm death checkpoint creatureGrowl
+`init()` (must be inside a user-gesture handler; also kicks off `_loadSamples`),
+`toggleMute()`, `setMood({drone,wind,rain,pitch})`, `update(dt, dangerLevel)`
+every frame (drives heartbeat). One-shots: `step jump land splash boxDrag lever
+doorMove connect disconnect detectTick alarm death checkpoint creatureGrowl
 creatureOpen`.
+
+**Recorded samples (session 5):** `AUDIO_SAMPLES` (top of file) maps names →
+`assets/audio/*.wav`, loaded via `fetch`+`decodeAudioData` into `this.samples`
+(needs http; on file:// or 404 it logs once and falls back to synth). Helpers:
+`_playSample(name, gain, rate) → bool` (one-shot, false if not loaded),
+`_ensureWaterBed()` (builds the looping water source once `waterLoop` decodes),
+`setWaterLevel(0..1)` (fades the water bed by proximity; no-op until loaded).
+`splash()` plays the `splash` sample if present else `_synthSplash()`.
+game.js `updatePlay` calls `setWaterLevel` each frame via `waterProximity(level,p)`.
 
 ### player.js
 - `tileAt(level,tx,ty)`, `isSolidTile/isWaterTile/isGrassTile/isOnewayTile(c)`,

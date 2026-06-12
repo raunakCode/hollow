@@ -210,9 +210,19 @@ const Render = {
         if (c === '#') {
           ctx.fillStyle = '#06080c';
           ctx.fillRect(x, y, TILE + 1, TILE + 1);
+          // exposed surface = a crisp highlight lip with the ground DARKENING
+          // just beneath it (an AO groove), so the top reads as a hard edge the
+          // figure clearly stands ON. (The old fix lightened the ground going
+          // downward, which put the brightest band right under the feet and
+          // read as a lit pocket the legs were sunk into — "stuck in ground".)
           if (!isSolidTile(tileAt(level, tx, ty - 1))) {
-            ctx.fillStyle = 'rgba(150,170,190,0.10)';
-            ctx.fillRect(x, y, TILE + 1, 3);
+            const grad = ctx.createLinearGradient(0, y + 1.5, 0, y + 9);
+            grad.addColorStop(0, 'rgba(0,0,0,0.0)');
+            grad.addColorStop(1, 'rgba(0,0,0,0.5)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(x, y + 1.5, TILE + 1, 7.5);
+            ctx.fillStyle = 'rgba(180,200,220,0.36)';
+            ctx.fillRect(x, y, TILE + 1, 1.5);
           }
         } else if (c === '-') {
           ctx.fillStyle = '#0a0d13';
@@ -509,8 +519,9 @@ const Render = {
       ctx.beginPath(); ctx.arc(headX, headY, headR + widen / 2, 0, Math.PI * 2); ctx.fill();
     };
 
-    // faint rim so the figure separates from same-value backgrounds
-    ctx.strokeStyle = ctx.fillStyle = opts.rim || 'rgba(130,150,175,0.20)';
+    // faint rim so the figure separates from same-value backgrounds — and so
+    // the legs read as a solid object terminating ON the floor, not sunk in it
+    ctx.strokeStyle = ctx.fillStyle = opts.rim || 'rgba(140,160,185,0.32)';
     drawFigure(2.6);
     ctx.strokeStyle = ctx.fillStyle = col;
     drawFigure(0);

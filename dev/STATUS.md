@@ -1,6 +1,94 @@
 # HOLLOW — status
 
-_Last updated: 2026-06-11 (session 3)._
+_Last updated: 2026-06-12 (session 5)._
+
+## Session 5 — "stuck in ground" (real cause found) + water-audio question
+
+User reported "stuck in the ground is back" with a zoomed screenshot
+(player between the two door-pillars at col ~80-107, legs reading as
+sunk below the floor line). Reproduced it exactly in-browser.
+
+- **Pixel-verified there is ZERO collision penetration** — sampled the
+  canvas luminance straight down the player's centre column: the bright
+  catch-light peak sits exactly at the feet (`p.y+p.h`), nothing below.
+  This is a *readability illusion*, not physics. Probes/fuzz already
+  said collision was clean; session 4 was right about that and wrong
+  about the cause of the look.
+- **The session-4 catch-light fix was itself the culprit.** It drew a
+  14px gradient that *lightened the ground going downward* from the
+  surface line — so the brightest band was directly under the feet,
+  fading down. The eye reads that lit pocket as space the legs are sunk
+  into. Replaced (`render.js tiles()`) with a crisp highlight lip
+  (1.5px, brighter) + a short AO groove that *darkens* the ground just
+  beneath it, so the top reads as a hard edge the figure stands ON.
+- **Bumped the figure rim** (`render.js humanoid()`) 0.20→0.32 alpha so
+  the whole silhouette — especially the lower legs at the contact point
+  — reads as a solid object terminating on the floor, not merging into
+  the dark ground.
+- **Verified** in-browser at the reported spot + start + water-edge +
+  plate: figure now clearly stands on the floor everywhere. `node
+  dev/headless.js` ALL PASS, `node dev/fuzz.js` 8 seeds clean.
+
+**Recorded water audio — rule changed + pipeline built.** User asked for
+recorded water "like most games" and chose **external files + local
+server** (the real rule change; `file://` blocks `fetch`). Implemented:
+- `AUDIO_SAMPLES` manifest + `_loadSamples` (fetch+decode) in `audio.js`;
+  `_playSample`, `_ensureWaterBed`, `setWaterLevel` helpers. `splash()`
+  uses the recorded clip if present, else `_synthSplash()` (old synth).
+- game.js `updatePlay` fades an ambient water bed by `waterProximity`.
+- `assets/audio/` + README manifest: drop in `water_splash.wav` and a
+  seamless `water_loop.wav`. **Missing/404/file:// all fall back to synth**
+  (verified over http: boots clean, 404→synth, no JS errors). CLAUDE.md
+  hard rule + header updated to record the deviation; ARCHITECTURE.md too.
+- User dropped in `water_splash.mp3` + `water_loop.mp3` (mp3 decodes fine);
+  verified over http they load/decode and the bed fades by proximity.
+- **Two post-listen tweaks:** (1) splash retriggered on every surface bob —
+  `inWater` is center-in-tile so a swimmer flickers it on/off. Replaced the
+  inline trigger with `maybeSplash(ent, wasInWater, dt)` (game.js) which
+  gates on `dryTime > 0.4` (must be clear of water for a beat first). Now
+  sustained surface swim / idle float = 0 splashes, real plunge = 1
+  (browser-verified). (2) splash too loud → playback gain 0.85–1.10 → 0.42–0.54.
+- **Still open:** the user's splash clip is 4.5s (long for a one-shot) — may
+  want trimming to ~0.5–1s if overlaps sound muddy. Recorded ambient is
+  water-only; rain/wind/etc. still synth.
+
+## Session 4 — playtest round 3 (ground readability + audio)
+
+User reported (with a zoomed screenshot) still looking "stuck in the
+ground," plus the ambient still sounding like radio static and water
+still sounding like knocking on wood. Investigated and fixed:
+
+- **"Stuck in the ground" was a readability problem, not collision.**
+  Probed the player at many spots (`dev/probe-sink.js`, since removed) —
+  feet-vs-ground penetration is **0px everywhere**; fuzz still clean.
+  The cause: the ground fill is near-black (`#06080c`) with only a faint
+  3px top edge, so the figure's dark legs merged into it and the surface
+  plane was ambiguous (a background beam at hip height could read as the
+  floor). Fix in `render.js tiles()`: exposed solid-tile tops now draw a
+  crisp 1.5px catch-light line + a 14px gradient falloff into the ground,
+  so the floor reads unmistakably and the player clearly stands *on* it.
+- **Water "wooden crate" sound.** Two causes: (1) `splash()` used low
+  tonal sine "bloops" (220–420 Hz) that ring like a wood block/marimba,
+  and (2) `land()`'s 320 Hz thud could fire on the pool floor. Rebuilt
+  `splash()` — bright airy highpass spray (3800→900) + lowpassed ploosh
+  body + **noise-based** rising bubble plips (new `_plip`, no tonal
+  pitch). Suppressed `land()` when `p.inWater` (`player.js`). Lowered the
+  splash entry threshold (`vy>40`→`vy>12` in `game.js`) so walking in
+  still splashes instead of landing silently then thudding.
+- **Ambient "radio static."** The rain layer was bright broadband
+  highpass noise (2500 Hz) — a flat carrier = static. Reworked
+  `_buildAmbient`: rain is now a darker bandpass wash (~1100 Hz, Q0.6)
+  with a slow tremolo so it surges/ebbs; wind dropped to a low hollow
+  moan (260 Hz, Q2.2) with its own slow amplitude swell. Radios don't
+  breathe; wind/rain does.
+
+**Verification:** `node dev/headless.js` → ALL PASS; `node dev/fuzz.js`
+→ 8 seeds clean; browser probe (brightened crops at the reported spot)
+shows a clear floor line under the feet, zero console errors. Audio
+graph builds clean but **nobody has heard the new splash/ambient yet** —
+needs the user's ears.
+
+## Session 3 — T3 systems + most of T4 rendering, all green
 
 ## Session 3 — T3 systems + most of T4 rendering, all green
 
