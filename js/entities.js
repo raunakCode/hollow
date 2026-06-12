@@ -126,14 +126,19 @@ function updateBoxes(world, level, dt) {
       const err = b.y - targetTop;                 // >0 = sitting too deep
       b.vy += (-err * 14 - b.vy * 6) * dt;
       b.vy = clamp(b.vy, -120, 160);
-      b.vx = damp(b.vx, 0, 3, dt);
+      if (!b.dragged) b.vx = damp(b.vx, 0, 3, dt);
     } else {
       b.vy += GRAVITY * dt;
       if (b.vy > MAX_FALL) b.vy = MAX_FALL;
-      b.vx = damp(b.vx, 0, b.grounded ? 18 : 1.5, dt);
+      // a box being pulled keeps the velocity the grab set this frame —
+      // ground friction would otherwise knock it below the player's pace and
+      // the grab would tear loose (sep grows). Push re-applies vx each frame,
+      // so it's only pulling that needs this.
+      if (!b.dragged) b.vx = damp(b.vx, 0, b.grounded ? 18 : 1.5, dt);
     }
     const res = moveEntity(b, dt, level, collectSolids(world, b), { oneway: true });
     b.grounded = res.groundRef !== null && b.vy >= 0;
+    b.dragged = false;                              // re-asserted each frame by the grab
   }
 }
 

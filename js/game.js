@@ -336,6 +336,7 @@ function updateBoxInteraction(p, world, dt) {
       p.grabbedBox = null;             // box fell away or tore loose
     } else {
       b.vx = clamp(p.vx, -90, 90);
+      b.dragged = true;                // skip box friction this frame (keeps pace)
       p.facing = b.x > p.x ? 1 : -1;   // face the box, even while pulling
       if (Math.abs(b.vx) > 8) dragNoise();
     }

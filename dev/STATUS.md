@@ -20,6 +20,14 @@ Then built **Chapter 1**.
 - **Hint captions render now** (the last open T4 item). `Render.hint` draws a
   faint serif key-glyph; `game.js` fades each hint's alpha in/out by player
   proximity to its radius. Used for ↑ / ↓ / X in Ch.1.
+- **Pull-box bug fix (user-reported).** Pulling a box (grab + walk away) tore
+  loose: the grab set `b.vx = clamp(p.vx, ±90)` but `updateBoxes` then damped it
+  toward 0 with ground friction (rate 18) the same frame, so the box only
+  traveled ~66 while the player walked 90 — `sep` grew past 14 and released.
+  Added a per-frame `b.dragged` flag (set by the grab, cleared in `updateBoxes`)
+  that skips the friction damp so a dragged box keeps the player's pace. Push is
+  unaffected (it re-applies vx each frame on contact). New `dev/ch1.js` pull test
+  (grab + sustained right pull, asserts no tear + the box travels).
 - **Ch.1 — THE FOREST** in `js/levels1.js` (165×24, no lethal hazards, pure
   traversal teaching): start + grass → step-up stones (jump) → 3-tile rock wall
   (mantle) → fallen hollow log, 3 thick with a 1-tile gap (crouch-under) → box

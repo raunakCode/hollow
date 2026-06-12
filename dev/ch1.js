@@ -151,6 +151,31 @@ const bx0 = box().x;
 keyDown('ArrowRight'); frames(70); releaseAll(); frames(5);
 check('box was pushed right', box().x > bx0 + TILE, `bx0=${bx0.toFixed(1)} now=${box().x.toFixed(1)}`);
 
+console.log('-- pull the box right without outrunning it (grab keeps pace)');
+// stage the box on the open flat walk (cols ~89-145, no low ceiling) with
+// the player just to its right, then hold grab + right for a sustained pull.
+const pb = box();
+pb.x = 95 * TILE; pb.y = FLOOR - 30; pb.vx = 0; pb.vy = 0; pb.grounded = true;
+const pp = P();
+pp.h = STAND_H; pp.x = pb.x + pb.w + 2; pp.y = FLOOR - STAND_H; pp.vx = 0; pp.vy = 0;
+pp.grabbedBox = null; pp.grabbing = false;
+frames(2);
+keyDown('KeyX'); frames(3);            // grab
+const held = !!P().grabbedBox;
+keyDown('ArrowRight');
+let tornLoose = false, maxSep = 0;
+for (let i = 0; i < 100; i++) {
+  frames(1);
+  if (!P().grabbedBox) { tornLoose = true; break; }
+  const b = box();
+  maxSep = Math.max(maxSep, P().x - (b.x + b.w));   // player is to the box's right
+}
+const pulled = box().x - 95 * TILE;
+releaseAll(); frames(3);
+check('grab engaged', held, at());
+check('box stayed grabbed through a long pull', !tornLoose, `maxSep=${maxSep.toFixed(1)}`);
+check('box actually traveled with the player', pulled > 3 * TILE, `pulled=${pulled.toFixed(1)}px`);
+
 console.log('-- the 4-tile cliff is impossible bare (no box)');
 place(69);                             // at the cliff face, box elsewhere
 let bare = false;
