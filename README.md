@@ -4,7 +4,12 @@ An atmospheric puzzle-platformer inspired by INSIDE. Built with vanilla JavaScri
 
 ## Play
 
-Open `index.html` in your browser — no build step needed. All audio is synthesized, all art is procedural.
+Run `python3 -m http.server` in this directory and open `http://localhost:8000` —
+no build step needed. All art is procedural.
+
+You can also open `index.html` directly (`file://`), but recorded audio
+samples won't load over `file://` (browsers block `fetch` there), so those
+sounds will fall back to their synthesized versions.
 
 ## Design Philosophy
 
