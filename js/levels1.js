@@ -1,6 +1,7 @@
 // ---------------------------------------------------------------
 // HOLLOW - levels1.js : chapters 1-4
-// Ch.1 (THE FOREST) is live below; 2-4 are appended as they're built.
+// Ch.1 (THE FOREST), Ch.2 (THE FENCE) and Ch.3 (THE YARD) are live below;
+// Ch.4 is appended when built.
 // The TEST GROUNDS mechanics sheet now lives in dev/testmap.js (dev-only,
 // loaded by the harnesses) so this file is the real game.
 // ---------------------------------------------------------------
@@ -60,5 +61,172 @@ LEVELS.push({
     { t: 'box', x: 62, y: 19 },                      // stuck in mud: push to the cliff
     { t: 'check', x: 75, y: 14, idx: 0 },            // on the plateau, past the only puzzle
     { t: 'exit', x: 158, y: 16, w: 2, h: 4 },
+  ],
+});
+
+// -- Ch.2 — THE FENCE --------------------------------------------
+// First stealth chapter: sweeping searchlights at the facility perimeter, in the
+// rain. Left to right:
+//   start flat (grass 5-9) | LIGHT 1 yard: dash gap-to-gap between grass islands
+//   (14-19, 25-30, 36-42), crouch in grass to vanish from the beam | checkpoint
+//   (48) | LIGHT 2 guards a 3-tile wall (60-61): cross the lit strip when the
+//   beam swings off, mantle to the dark corridor | quiet corridor 62-76 |
+//   LIGHT 3 — the roofed GATE-HOUSE (cols 77-111, roof rows 14-16, so beams
+//   can't be jumped over and the gate seals floor-to-ceiling so a box can't be
+//   a step over it). Two stages:
+//     A. an angled beam (3a) trained on the gate lever (86) — it's ALWAYS lit
+//        there, so you can't run-up and pull it; push the box (waits at 81) in
+//        as a moving shadow, pull the lever from its cover, the gate (96)
+//        latches open. Checkpoint just past the gate (97).
+//     B. an OVERHEAD beam (3b, col 104) sweeps the exit corridor — a floor box
+//        casts no useful side-shadow under it, so it's a forced solo run: time
+//        the dash through when the beam is at the far side.
+//   | walk out into the facility (exit 121).
+//   All three light geometries (+ the anti-cheese: no jump-over, no box-climb,
+//   bare-lever caught) are validated in dev/ch2.js — tweak there if you move a
+//   fixture.
+LEVELS.push({
+  name: 'THE FENCE',
+  bg: 'facility',
+  seed: 102,
+  palette: { sky0: '#06080c', sky1: '#141b26', horizonGlow: 'rgba(170,180,200,0.12)' },
+  mood: { drone: 0.08, wind: 0.02, rain: 0.02, pitch: 48 },
+  rain: true,
+  dark: false,
+  rows: [
+    "............................................................................................................................................",
+    "............................................................................................................................................",
+    "............................................................................................................................................",
+    "............................................................................................................................................",
+    "............................................................................................................................................",
+    "............................................................................................................................................",
+    "............................................................................................................................################",
+    "............................................................................................................................################",
+    "............................................................................................................................################",
+    "............................................................................................................................################",
+    "............................................................................................................................################",
+    "............................................................................................................................################",
+    "............................................................................................................................################",
+    "............................................................................................................................################",
+    ".............................................................................###################################............################",
+    ".............................................................................###################################............################",
+    ".............................................................................###################################............################",
+    "............................................................##..............................................................################",
+    "............................................................##..............................................................################",
+    ".....GGGGG....GGGGGG.....GGGGGG.....GGGGGGG.................##...................................###############............################",
+    "############################################################################################################################################",
+    "############################################################################################################################################",
+    "############################################################################################################################################",
+    "############################################################################################################################################",
+  ],
+  playerStart: [3, 19],
+  entities: [
+    { t: 'hint', x: 16, y: 16, text: '↓' },          // crouch in the grass to hide from the beam
+    { t: 'hint', x: 81, y: 18, text: 'X' },          // the box: push it into the beam as a moving shadow
+    // LIGHT 1 — wide slow sweep over the whole yard
+    { t: 'light', x: 28, y: 3, a0: 0.88, a1: 2.18, speed: 0.13, len: 22, fov: 0.34 },
+    { t: 'check', x: 48, y: 18, idx: 0 },            // past the yard, safe
+    // LIGHT 2 — steep downward sweep of the strip in front of the mantle wall
+    { t: 'light', x: 54, y: 3, a0: 1.32, a1: 1.82, speed: 0.2, len: 16, fov: 0.30 },
+    // LIGHT 3 — the roofed gate-house (cols 77-111). Stage A: box shadow → lever.
+    { t: 'box', x: 81, y: 19 },                       // the shield (waits left of the lit zone)
+    { t: 'lever', x: 86, y: 19, id: 'g3', on: false },
+    { t: 'door', x: 96, y: 17, h: 3, links: ['g3'], latch: true },   // gate, floor-to-ceiling
+    { t: 'light', x: 94, y: 17, a0: 2.851, a1: 2.991, speed: 0.14, len: 12, fov: 0.30 },  // 3a, trained on lever
+    { t: 'check', x: 98, y: 17, idx: 1 },            // up the step, past the gate (stage A done)
+    // Stage B: a raised floor (1-tile step at 96->97) the box can't be pushed up,
+    // so this beam can't be box-shielded — it's a forced solo timed dash.
+    { t: 'light', x: 104, y: 17, a0: 0.45, a1: 2.69, speed: 0.11, len: 9, fov: 0.85 },
+    { t: 'exit', x: 121, y: 16, w: 2, h: 4 },        // into the facility
+  ],
+});
+
+// -- Ch.3 — THE YARD ---------------------------------------------
+// First interior chapter; the BOX / PLATE / LIFT / BRAKE teaching ground. No
+// lethal hazards (gentle, like Ch.1) — R always resets the chapter if a box is
+// wedged. Left to right, three rooms, each escalating one idea (see
+// dev/CH3_REWORK.md for the design + the hard lift-physics constraints):
+//   ROOM A — plates. A gate (door col 31, `all` of two plates, latched) needs
+//     BOTH plate pa1 (20-21) and pa2 (25-26) pressed at once. You only weigh
+//     enough for one: push the box (16) onto pa1, hop over it, stand on pa2 ->
+//     the gate latches. (Teaches: plates = weight, a box can stand in for you,
+//     `all` needs both, a latch only has to trigger once.) | checkpoint 0 (34).
+//   ROOM B — counterweight lift (the BASIC lift). Push the box (39) onto
+//     platform A (42-43); it sinks into its 2-deep pit and raises the far
+//     platform B (48-50) to row 18, where the box's weight HOLDS it (position
+//     is state). Hop the air gap (47) from the divider (44-46) onto the held B
+//     — you + the box now balance the lift, so B stays put while you mantle the
+//     exit ledge (51-57, 4-tile face, row 16). The box can't reach the ledge
+//     face (pit B blocks it), so the lift is genuinely required. Step down the
+//     stairs into Room C. | checkpoint 1 (63, Room-C entrance).
+//   ROOM C — THE CRANE (the lift BRAKE: `lift.lock`, a lever that freezes a
+//     platform regardless of weight). Push the crate (65) onto platform A
+//     (70-71); its weight cranks platform B (76-78) up from the floor toward
+//     its top clamp at row 17. But a ceiling girder (row 15, cols 75-76) caps
+//     your jump so B at the clamp is UN-mountable — you must operate the BRAKE
+//     lever brkC (73; hands free because the crate, not your body, drives) to
+//     freeze B at a mountable MID height (row 18-19) as it rises, then hop onto
+//     it and mantle the exit ledge (79-84, row 16). The clamp overshoots
+//     uselessly; only a braked mid height bridges. Stairs down to the exit.
+//     (Why Room B is a plain counterweight lift, not a brake puzzle: a body-
+//     raised platform "empty-holds" on its own and a climber pogos rather than
+//     loads it, so the brake can't be made necessary without a persistent
+//     counterweight — see dev/CH3_REWORK.md §"empty holds".)
+//   All geometry, solvability and the no-bypass / no-softlock properties are
+//   asserted in dev/ch3.js — tweak there if you move a fixture. Rows were built
+//   with a throwaway column-range generator (deleted) — regenerate that way if
+//   you re-author; never hand-count the 95-char rows.
+LEVELS.push({
+  name: 'THE YARD',
+  bg: 'interior',
+  seed: 103,
+  palette: { sky0: '#070a0e', sky1: '#121821', horizonGlow: 'rgba(140,150,170,0.07)' },
+  mood: { drone: 0.07, wind: 0.012, rain: 0.0, pitch: 46 },
+  rain: false,
+  dark: false,
+  rows: [
+    "...............................................................................................",
+    "...............................................................................................",
+    "...............................................................................................",
+    "...............................................................................................",
+    "...............................................................................................",
+    "...............................................................................................",
+    "...............................#...............................................................",
+    "...............................#...............................................................",
+    "...............................#...............................................................",
+    "...............................#...............................................................",
+    "...............................#...............................................................",
+    "...............................#...............................................................",
+    "...............................#...............................................................",
+    "...............................#...............................................................",
+    "...............................#...............................................................",
+    "...............................#...........................................##..................",
+    "...............................#...................#######.....................######..........",
+    "...................................................########....................#######.........",
+    "...................................................#########...................########........",
+    "...................................................##########..................#########.......",
+    "##########################################..###....###################..###....################",
+    "##########################################..###....###################..###....################",
+    "######################################################################..#######################",
+    "###############################################################################################",
+  ],
+  playerStart: [3, 19],
+  entities: [
+    { t: 'hint', x: 13, y: 18, text: 'X' },           // push the box onto the plate
+    // ROOM A — two-plate latched gate (`all`)
+    { t: 'box', x: 16, y: 19 },                        // push onto pa1
+    { t: 'plate', x: 20, y: 19, w: 2, id: 'pa1' },
+    { t: 'plate', x: 25, y: 19, w: 2, id: 'pa2' },
+    { t: 'door', x: 31, y: 17, h: 3, links: ['pa1', 'pa2'], mode: 'all', latch: true },
+    { t: 'check', x: 34, y: 18, idx: 0 },              // just past the gate
+    // ROOM B — counterweight lift: the box on A raises + HOLDS B; board it
+    { t: 'box', x: 39, y: 19 },                        // push onto platform A -> raises B
+    { t: 'lift', ax: 42, ay: 20, bx: 48, by: 20, aw: 2, bw: 3, travel: 2 },
+    { t: 'check', x: 63, y: 18, idx: 1 },              // Room-C entrance (Room B done)
+    // ROOM C — THE CRANE: crate drives B up, brake it at a mid height to bridge
+    { t: 'box', x: 65, y: 19 },                        // crate — push onto platform A
+    { t: 'lift', ax: 70, ay: 20, bx: 76, by: 20, aw: 2, bw: 3, travel: 3, lock: 'brkC' },
+    { t: 'lever', x: 73, y: 19, id: 'brkC' },          // the brake handle (crane operator)
+    { t: 'exit', x: 90, y: 19, w: 2, h: 4 },           // past the exit ledge, down the stairs
   ],
 });

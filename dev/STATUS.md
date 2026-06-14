@@ -1,6 +1,224 @@
 # HOLLOW — status
 
-_Last updated: 2026-06-12 (session 8)._
+_Last updated: 2026-06-14 (session 12)._
+
+## Session 12 — Ch.3 lift-half rework SHIPPED (Room C = THE CRANE / brake)
+
+Finished the Ch.3 rework planned in session 11 (`dev/CH3_REWORK.md`). The goal
+was to stop Rooms B and C from being the same puzzle. Outcome: **Room C is now
+THE CRANE (the brake), genuinely different from Room B (the plain counterweight
+lift).** Rebuilt both rooms' geometry + rewrote their `dev/ch3.js` tests; full
+suite green; browser render clean.
+
+- **Key finding that reshaped the plan (validate-by-harness paid off):** the
+  plan's Room B — *body*-as-counterweight + brake — **can't make the brake
+  necessary.** Two engine truths: (1) **"empty holds"** — a platform you raise
+  with your own body stays put once you step off (0-v-0 balance), so no brake is
+  needed to hold it; (2) **pogo-mantle** — to climb a raised platform you bounce
+  off it (airborne ~95% of frames), so it never accumulates the sink that would
+  make the brake matter (traced it: B sank 0.05 tiles before the player mantled
+  away). The brake is only *robustly* necessary against a **persistent
+  imbalance — a crate.** So I split it: **Room B = the basic counterweight lift**
+  (a box raises + holds B; board the balanced platform), **Room C = THE CRANE**
+  (crate + brake). Recorded in DESIGN.md + the lift mechanic note.
+- **Room C — THE CRANE (the new puzzle).** Push the crate onto platform A; its
+  weight cranks B up from the floor toward its top clamp (row 17). A **ceiling
+  girder** (row 15 over the mount gap) caps your jump so B *at the clamp* is
+  un-mountable — you must pull the **brake lever** (`brkC`) to freeze B at a
+  mountable **mid** height (row 18) as it rises, then hop on and mantle the exit
+  ledge. The clamp overshoots uselessly; only a braked mid height works. I
+  **measured the mount limits in-engine first** (`dev/_probe_mount.js`, deleted):
+  over a 1-tile air gap a platform is mountable up to **3 tiles up (row 17)** but
+  not 4; a ceiling at **row 15** splits row-18 (mountable) from row-17 (not) —
+  that split is what forces the brake. The crate-driven A sinks into a 3-deep
+  pit (stays on the map); B starting at floor can only rise 3 tiles, so a
+  *height*-unmountable overshoot was impossible — hence the girder.
+- **Geometry** rebuilt with a fresh column generator (`dev/_gen_ch3.js`,
+  deleted): the map is now **95×24** (was 130; tighter pacing). Room A unchanged.
+  Entities: 3 boxes / 2 plates / 1 door / 2 lifts (only lift 1 has `lock:'brkC'`)
+  / 1 lever / 2 checkpoints / 1 exit.
+- **`dev/ch3.js` rewritten** for the new rooms: Room A (unchanged), Room B
+  (box raises+holds B, board+mantle solve, bare ledge unclimbable, box-can't-
+  cheese-the-ledge), Room C (crate cranks past the mid band to the clamp; clamp
+  un-mountable; mid-brake mountable+solvable; the real X-lever brake holds under
+  load and releases; full crane solve), exit→title. **`node dev/ch3.js` ALL PASS.**
+- **Verified:** `node dev/headless.js` ALL PASS, `node dev/fuzz.js` FUZZ CLEAN,
+  `node dev/t5.js` ALL PASS, `node dev/ch1.js` ALL PASS, `node dev/ch2.js` ALL
+  PASS, `node dev/ch3.js` ALL PASS. Browser render of Rooms B & C **clean (0
+  console errors)**; brightened zoom shows the lift platforms, crate, brake
+  lever, the ceiling girder, and the stepped exit ledges reading correctly.
+- **Still needs the user (Ch.3 feel sign-off):** play THE YARD. Does Room C's
+  "watch B rise and brake it at the right height" read as a crane without text?
+  Is the ceiling girder legible as *why* you can't ride it to the top? Is Room B
+  → Room C a clear escalation (counterweight → you control the position)?
+  Machine-verified ≠ feel-verified.
+
+## Session 11 — Ch.3 later-half rework PLAN + lift brake engine feature
+
+Started a creative rework of Ch.3's lift half. The honest problem: **Rooms B and
+C are the same puzzle** ("load A → raise B → climb B"). That's the *only*
+raise-and-use pattern the lift physics allow with one box — with ≤1 box the
+player can never ride a platform up (counterweight maxes at your own weight =
+balanced), and boarding any raised platform alone sinks it. The fix is to
+**decouple position from weight** with a lift **brake/lock**.
+
+- **Designed the full rework in `dev/CH3_REWORK.md`** (read it before touching
+  the lift rooms): critique, the exact lift-physics constraints, the brake spec,
+  reworked **Room B "Crank"** (crank a platform up with your own body, brake it,
+  climb the platform you raised — you can't be counterweight *and* climber) and
+  **Room C "The Crane"** (a crate drives the lift; brake it at a chosen **mid**
+  height the clamp overshoots, to bridge to the exit), richer future variants
+  (2-box ride-up, cargo-crane, for Ch.6), the hard-won lessons (air-gap, hold-
+  jump-for-height), and an ordered resume checklist.
+- **Implemented the brake engine feature** (the one piece that unblocks all of
+  it): `lift.lock` = a signal id (lever/plate) that freezes the lift. Parsed in
+  `spawnEntities`; `updateLifts` evaluates signals and early-`continue`s when
+  locked. **Additive + safe — `lock` defaults null so every existing lift is
+  unchanged.** `dev/ch3.js` has an isolated brake assertion (locks under load,
+  resumes when released). ARCHITECTURE.md updated (lift `lock` field +
+  updateLifts note).
+- **NOT yet done (next session, per the doc's checklist §8):** rebuild Rooms B &
+  C geometry to actually USE the brake + rewrite their `dev/ch3.js` tests, then
+  fold the brake into DESIGN.md. The current shipped Rooms B/C still work and
+  pass — the rework replaces them.
+- **Verified:** full suite green with the brake in — `node dev/headless.js` ALL
+  PASS, `node dev/fuzz.js` FUZZ CLEAN, `node dev/t5.js` ALL PASS, `node
+  dev/ch1.js` ALL PASS, `node dev/ch2.js` ALL PASS, `node dev/ch3.js` ALL PASS
+  (incl. the new brake test).
+
+## Session 10 — T8 (Ch.3 THE YARD) built: boxes / plates / lift intro
+
+Built **Chapter 3 — THE YARD**, the first interior chapter and the box / plate
+/ counterweight-lift teaching ground (no lethal hazards, gentle like Ch.1; R
+always resets the chapter if a box is wedged). Three rooms, one idea each, all
+in `js/levels1.js` (130×24, `bg:'interior'`, seed 103). Authored the geometry
+with a throwaway generator (column-range fills → exact equal-width rows; deleted
+after authoring) and validated every beat by driving the real engine in the new
+`dev/ch3.js` harness.
+
+- **ROOM A — plates.** A latched gate (door col 31, `all` of pa1 (20-21) + pa2
+  (25-26)) needs both plates pressed at once; you only weigh enough for one, so
+  push the box onto pa1, hop over it, stand on pa2 → the gate latches. Teaches:
+  plates = weight, a box substitutes for you, `all` needs both, latch triggers
+  once. | checkpoint 0.
+- **ROOM B — counterweight lift (ascend).** A 4-tile plateau (62-83) is
+  unclimbable bare. Push the box onto platform A (pit 53-54) and it sinks,
+  raising platform B (pit 58-61) two tiles **and holding it there** (position is
+  state). Hop up onto raised B, mantle the plateau. The box can't reach the
+  plateau face (pit B blocks it) so the lift is genuinely required. | checkpoint
+  1 (on the plateau) | quiet walk + step down into Room C.
+- **ROOM C — lift + plate (synthesis).** The exit gate (door col 115, latched)
+  opens from plate pc, which sits on a 4-tile ledge (103-110) reachable only via
+  the second lift (box onto A2 (94-95) raises B2 (99-102), board, mantle, press
+  pc). Drop down, walk the stairwell to the exit. | checkpoint 2 (room-C
+  entrance — Room B is finished behind it).
+
+- **Two geometry/feel lessons learned the hard way (both fixed by building +
+  driving, not by eyeballing):**
+  1. **A raised lift platform flush against the divider is un-mountable** — its
+     side is a wall and its underside a ceiling the player bonks (jump apex
+     stalls at the platform bottom). Fix: a **1-tile air gap** beside the
+     platform's approach edge (pit B/B2 are one tile wider than the platform, on
+     the divider side) so the player arcs *up over the gap* and lands on top.
+  2. **HOLLOW has variable jump height**, so a 1-frame jump tap is only a minimum
+     hop — useless for clearing 2 tiles. The harness's auto-hop now *holds* jump
+     ~16 frames for full height (a real lesson for any future scripted climb).
+- **`dev/ch2.js` exit assertion updated:** Ch.2 is no longer the last chapter, so
+  its exit now advances to Ch.3 (asserts `chapterIdx===2`, was `state==='title'`).
+- **Verified:** `node dev/headless.js` ALL PASS, `node dev/fuzz.js` FUZZ CLEAN,
+  `node dev/t5.js` ALL PASS, `node dev/ch1.js` ALL PASS, `node dev/ch2.js` ALL
+  PASS, **`node dev/ch3.js` ALL PASS** (sanity; Room A bypass-guards + full
+  solve; Room B bare-plateau-unclimbable, box-raises-and-holds-B, full ascent,
+  no box-cheese; Room C gate-shut-until-plate, lift→plate→latch, full ascent;
+  exit ends the chapter). Browser render of all three rooms is clean (0 console
+  errors) and the box/plates/gate/lift platforms read in a brightened zoom.
+- **Still needs the user (Ch.3 hand sign-off):** play THE YARD. Does the
+  two-plate "use the box as a weight" click without text? Is the lift's
+  load-A-to-raise-B legible, and is hopping onto the raised platform + mantling
+  the plateau tense-but-fair (not fiddly)? Does the interior mood (no rain,
+  dust motes, darker palette) land after two outdoor chapters? Machine-verified
+  ≠ feel-verified.
+
+## Session 9b — Ch.2 Light 3 rebuilt: cheese-proof + two-stage (user feedback)
+
+User playtested and broke the Light 3 gate puzzle: "used the box to jump on to
+the door, then jumped over the light." Two real failures — the box doubled as a
+climbing step over the gate, and the low/open beam could be jumped over. Said
+the puzzles are too easy and to make them hard + creative. Rebuilt Light 3 as a
+**sealed, two-stage gate-house** (cols 77-111):
+
+- **Anti-cheese by structure:** the whole gate-house is **roofed** (tiles rows
+  14-16) so no beam can be jumped over, and the gate is a **floor-to-ceiling**
+  door (rows 17-19, meets the roof underside) so a box can't be a step over it.
+  Both exploits are now impossible (asserted in dev/ch2.js).
+- **Stage A — box shadow → lever.** Beam 3a (col 94, on the roof) is *trained on
+  the gate lever* (col 86): it's ALWAYS lit there (dark window 0.00s), so you
+  can't run up and pull it bare — you must push the box (waits col 81) in as a
+  moving shadow, pull the lever from cover (gate latches), then clamber over the
+  box, through the gate, up a step, to checkpoint 1.
+- **Stage B — forced solo timing.** Past the gate the floor is **raised one tile**
+  (a step the box physically can't be pushed up — verified), so the box is left
+  behind and the stage-B beam (3b, col 104) can't be box-shielded. It's a wide
+  slow sweep you must *time* a dash through (mistimed = caught; a dwell column is
+  lethal standing). This also dodges the "overhead beams are only box-proof
+  straight down, shieldable at the angled extremes" trap — exclusion-by-step is
+  airtight where overhead-geometry isn't.
+- Geometry + every anti-cheese property validated numerically before building;
+  dev/ch2.js now has explicit bypass tests (box-climb-gate fails, box-can't-climb-
+  step, bare-lever caught, overhead dwell lethal, dash solvable-AND-punishing)
+  and a full stage-A traversal (no softlock). **`node dev/ch2.js` ALL PASS**;
+  full suite (headless/fuzz/t5/ch1) green; browser render of both stages clean
+  (box shadow reads clearly).
+- **Lights 1 & 2 NOT yet hardened** — the user said "some of the puzzles" are
+  easy; Light 3 (their example) is done. 1 (yard) and 2 (mantle wall) aren't
+  cheesable (overhead beams can't be jumped over) but have over-generous timing
+  windows. Open question to the user below on how hard to push them.
+
+## Session 9 — T7 (Ch.2 THE FENCE) built + searchlight cones now cast shadows
+
+Built **Chapter 2 — THE FENCE**, the first stealth chapter (three sweeping
+searchlights in the rain), and fixed a readability gap the chapter exposed: the
+light cone was a flat wedge that drew straight over walls and the box, so the
+core "push a box to make a standing shadow" puzzle had no *visible* shadow.
+
+- **Ch.2 — THE FENCE** in `js/levels1.js` (140×24, `bg:'facility'`, seed 102).
+  Left→right: start grass → **Light 1** wide slow sweep over a yard of grass
+  islands (dash the gaps, crouch in grass to vanish) → checkpoint (48) →
+  **Light 2** steep sweep of the strip in front of a 3-tile mantle wall (60-61):
+  cross when the beam swings off, mantle to the dark corridor → quiet corridor →
+  **Light 3** low near-horizontal beam guarding the gate lever: push the box (80)
+  as a *rolling shield*, stop in its shadow to pull the lever (gate latches),
+  keep pushing through the gate (92) → checkpoint (94) → exit into the facility.
+- **The Light 3 geometry was nailed analytically before building.** A box only
+  occludes a beam to a ground-standing player if the beam is shallow, so Light 3
+  is mounted **low** (row 16) and to the right; the box then casts a shadow that
+  holds for the whole shielded push. Nice emergent property: the sweep's overlap
+  point (**col 88**) is *always lit*, so a no-box run from lever to gate gets
+  caught crossing it — the box is genuinely required, not optional.
+- **Light cones now respect occluders (render fix).** `Render.lightCone` was a
+  smooth gradient arc; it now fans `_coneRayHit` rays across the fov, each
+  stopped at the first solid tile / box / closed door — the **same occluders the
+  detection raycast uses** — so walls clip the beam and a pushed box carves a
+  real, visible shadow that matches exactly where the player is hidden. Signature
+  gained `(…, level, world)`; call site in `game.js drawPlay` updated.
+- **`dev/ch1.js` final test updated:** Ch.1 is no longer the last chapter, so its
+  exit now advances to Ch.2 (asserts `chapterIdx===1`) instead of returning to
+  title.
+- **Verified:** `node dev/headless.js` ALL PASS, `node dev/fuzz.js` FUZZ CLEAN,
+  `node dev/t5.js` ALL PASS, `node dev/ch1.js` ALL PASS, **`node dev/ch2.js`
+  ALL PASS** (sanity + 3 lights; standing in the yard is detected while
+  crouch-in-grass hides; the 3-tile wall mantles; the lever is lethal bare but
+  safe behind the box and latches the gate; the full rolling-shield push survives
+  lever-pull-to-gate; exit ends the chapter). `node dev/browser-test.js` BROWSER
+  SMOKE PASS, plus a Ch.2 render pass (facility bg + 3 cones, 0 console errors)
+  and the shadow math spot-checked (rays stop at box/ground, pass through open
+  sky). Box-shadow confirmed rendering in a zoomed browser capture.
+- **Still needs the user (Ch.2 hand sign-off):** play THE FENCE. Do the sweep
+  windows feel tense-but-fair (Light 1's dark gaps are generous ~3-6s; speed up
+  if dull)? Does "crouch in grass = invisible" read on its own? Is the box→shadow
+  Light 3 puzzle legible — can you *see* the shadow and understand the rolling
+  shield, or is the beam too faint (base cone alpha is unchanged from testmap;
+  easy to bump for Ch.2 if needed)? Machine-verified ≠ feel-verified.
 
 ## Session 8 — T2/T3/T4 signed off; T6 (Ch.1 THE FOREST) built
 

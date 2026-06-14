@@ -378,7 +378,7 @@ function drawPlay(dt) {
     Render.humanoid(ctx, h, cam, { huskGlow: true, connected: !!Game.helmed });
   Render.humanoid(ctx, Game.player, cam, {});
   for (const ht of Game.world.hints) Render.hint(ctx, ht, cam);
-  for (const Lt of Game.world.lights) Render.lightCone(ctx, Lt, cam);
+  for (const Lt of Game.world.lights) Render.lightCone(ctx, Lt, cam, Game.level, Game.world);
   if (ch.dark) {
     const p = Game.player;
     Render.darkness(ctx, 0.93, [

@@ -58,7 +58,14 @@ fall into need ramps back out, or the puzzle must still be solvable.
 ~58 px/s per unit of weight difference; equal weight = holds position
 (rope friction — position is *state* the player sets). Player, husk, and box
 each weigh 1. Brain food: getting weight onto the far side, riding while
-balanced, using a husk as a remote-controlled counterweight.
+balanced, using a husk as a remote-controlled counterweight. **Brake / lock**
+(`lift.lock: 'signalId'`, a lever or plate): freezes the platform regardless of
+weight, so a *crate-driven* lift can be stopped at a chosen mid-height the clamp
+would otherwise overshoot (a crane). Note the engine limit found while building
+Ch.3: the brake can't be made *necessary* against a player's own body — a
+body-raised platform "empty-holds" once you step off, and a climber pogos off a
+platform rather than loading it. The brake needs a *persistent* counterweight (a
+crate) to matter. Introduced Ch.3 Room C; reused Ch.6.
 
 **Water**: swim freely; can only jump out near the surface. Breath: ~9 s of
 head-underwater, then drowning death; the view closes to a shrinking porthole
@@ -116,17 +123,20 @@ wall: time the mantle. Light 3 watches a lever that opens the gate (latch):
 push a box into the beam's line to create standing shadow, pull lever from
 cover. Checkpoint after gate. Exit into the facility.
 
-### Ch. 3 — THE YARD (boxes, plates, lift intro; interior bg)
-A: door needs two plates (`all`): one box + yourself; realize you can leave
-the box and walk through while... no — plates are momentary: stack puzzle —
-box on plate 1, plate 2 is *beyond* the door: use `hold: 3` on plate 2 from a
-previous room's box drop. Keep it gentle. B: first counterweight lift: far
-platform must come down — push a box onto the near platform? Wrong: push box
-onto platform B so A rises empty; step on A (1v1, balanced where it stands);
-realize you must *first* sink A by standing on it, step off at the bottom,
-push the box on, etc. Let the player discover that lift position is state.
-C: lift as adjustable bridge: park it mid-height to jump across to a ledge.
-Latch door + checkpoint after each. Exit: stairwell down.
+### Ch. 3 — THE YARD (boxes, plates, lift + brake; interior bg)
+Built form (session 12; see dev/CH3_REWORK.md for the design history). Three
+escalating rooms, gentle, no lethal hazards. A: latched gate needs two plates
+(`all`) at once — push a box onto plate 1 and stand on plate 2 yourself (you
+only weigh enough for one). B: first **counterweight lift** — push a box onto
+platform A; it sinks and raises + *holds* the far platform B (position is
+state), and you board the balanced B to mantle a 4-tile exit ledge (the box
+can't reach the ledge face, so the lift is required). C: **THE CRANE** — the
+new **brake**: a crate cranks platform B up, but a ceiling girder makes its top
+clamp un-mountable, so you operate a brake lever to freeze B at a mountable
+*mid* height as it rises, then climb it. (Originally planned as a body-driven
+"crank" with the brake in Room B too; that proved un-buildable — the brake
+needs a persistent crate to be necessary — so Room B is the plain counterweight
+lift and Room C carries the brake.) Checkpoints between rooms. Exit: stairs down.
 
 ### Ch. 4 — THE DRAINS (water; interior bg, dim)
 A: open pool, learn swimming + jumping out. B: flooded corridor with air
@@ -179,6 +189,7 @@ cinematic state). After credits: "press R" → title.
 - ~~`light.offWhen: [ids]` — signals disable a searchlight.~~ done (T5)
 - ~~Breath timer + drowning + screen-darkening tell.~~ done (T5)
 - ~~Scripted chase trigger (ch. 7D) — a zone that forces a long charge.~~ done (T5: `trigger` entity)
+- ~~Lift brake/lock (`lift.lock`) — a signal freezes a counterweight lift.~~ done (session 11; used Ch.3 Room C)
 - Ending cinematic state (ch. 8) + credits. *(T13)*
 - ~~Save/continue, pause menu, title screen.~~ done (T3 save + T5 pause/title menus)
 

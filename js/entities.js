@@ -58,6 +58,7 @@ function spawnEntities(defs, seed) {
           aw: (d.aw || d.w || 2) * TILE, bw: (d.bw || d.w || 2) * TILE,
           travel: (d.travel || 3) * TILE,
           off: (d.off || 0) * TILE, vel: 0,
+          lock: d.lock || null,   // signal id (lever/plate) that FREEZES the lift (the brake)
         });
         break;
       case 'creature':
@@ -179,7 +180,13 @@ function updateDoors(world, dt) {
 }
 
 function updateLifts(world, dt, heavies) {
+  const sig = evalSignals(world);
   for (const L of world.lifts) {
+    // the brake: while the lock signal is active the lift is frozen in place
+    // regardless of weight (off held), so you can stand on a platform nothing
+    // is counterweighting. Platforms stay solids; riders need no carry (off
+    // doesn't change). Default lock=null = always free.
+    if (L.lock && sig[L.lock]) { L.vel = 0; continue; }
     const r = liftRects(L);
     let wA = 0, wB = 0;
     const riders = { a: [], b: [] };

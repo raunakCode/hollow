@@ -12,7 +12,7 @@ js/player.js    tile queries, moveEntity physics, makeHumanoid/updateHumanoid
 js/entities.js  spawnEntities, collectSolids, per-system update functions
 js/render.js    Render: backgrounds, tiles, humanoid drawing, post fx
 js/levels1.js   chapters 1–4 — defines global LEVELS = [] and pushes onto it
-                (Ch.1 THE FOREST is live; 2–4 appended as built)
+                (Ch.1 FOREST, Ch.2 FENCE, Ch.3 YARD live; Ch.4 appended as built)
 dev/testmap.js  DEV-ONLY all-mechanics TEST GROUNDS sheet. Not in index.html;
                 the harnesses load it after levels2.js / before game.js, where
                 it does LEVELS.length=0 + push() to replace the chapter list.
@@ -62,8 +62,9 @@ Game.js should derive `level = { w, h, rows }` from this (`w` = row length,
 {t:'light', x,y, a0,a1, speed:0.5, phase:0, len:11, fov:0.30, offWhen:'id'}  // angles in radians; y/x = fixture tile. offWhen: signal id that powers the cone DOWN (disabled = no detection, dims in render)
 {t:'husk',  x,y}                               // y = tile whose bottom is the feet
 {t:'helm',  x,y}                               // 1×2-tile interaction zone
-{t:'lift',  ax,ay, bx,by, w:2, travel:3, off:0}  // counterweight: A at ay-off, B at by+off
+{t:'lift',  ax,ay, bx,by, w:2, travel:3, off:0, lock:'id'}  // counterweight: A at ay-off, B at by+off
                                                // w sets both platform widths; or aw/bw to size each
+                                               // lock: signal id (lever/plate) that FREEZES the lift (the brake) while active
 {t:'creature', x,y, range:15}                  // y = floor tile it stands on
 {t:'check', x,y, idx:N}                        // idx = checkpoint index, ascending
 {t:'exit',  x,y, w:2, h:4}
@@ -138,7 +139,8 @@ game.js `updatePlay` calls `setWaterLevel` each frame via `waterProximity(level,
   `updateBoxes(world, level, dt)` (buoyancy + friction included);
   `updatePlates(world, dt, heavies)` where heavies = [player, ...husks,
   ...boxes]; `updateDoors(world, dt)` (reads signals from levers+plates via
-  `evalSignals`); `updateLifts(world, dt, heavies)` (carries riders);
+  `evalSignals`); `updateLifts(world, dt, heavies)` (carries riders; a lift
+  whose `lock` signal is active is frozen in place — the brake);
   `updateTriggers(world, player)` (scripted chase zones; fires once on enter);
   `updateLights(world, level, player, hidden, dt) → {killed, danger}`
   (`hidden` = crouching in grass; handles occlusion raycast vs tiles/boxes/
@@ -171,6 +173,12 @@ width via `liftRects`), `creature` (body + eye), `check` (lamp),
 `exitGlow`, `hint`. `humanoid` has a faint rim-light so the figure separates
 from same-value backgrounds. `hint(ctx, h, cam)` draws a faint serif key-glyph
 at `h.alpha` (game.js fades alpha in/out by player proximity to `h.r`).
+`lightCone(ctx, Lt, cam, level, world)` fans a ray per ~0.012 rad across the
+fov, each stopped by `_coneRayHit(level, world, …)` at the first solid tile /
+box / closed door (the *same* occluders `updateLights` raycasts for detection),
+so walls clip the beam and a pushed box casts a visible shadow that matches
+where the player is actually hidden. Brightness still scales with `Lt.detect`;
+a `disabled` (offWhen) fixture dims to a dead glow.
 
 ### game.js
 

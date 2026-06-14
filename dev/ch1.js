@@ -204,12 +204,13 @@ for (let i = 0; i < 200 && P().x < 150 * TILE; i++) { frames(1); if (Game.state 
 releaseAll();
 check('crossed under the fence', P().x >= 150 * TILE && alive, at());
 
-console.log('-- reach the exit -> chapter ends (single chapter -> title)');
+console.log('-- reach the exit -> advances to the next chapter (Ch.2)');
 place(153);
 keyDown('ArrowRight');
-for (let i = 0; i < 400 && Game.state === 'play'; i++) frames(1);
+let advanced = false;
+for (let i = 0; i < 400 && !advanced; i++) { frames(1); if (Game.chapterIdx === 1) advanced = true; }
 releaseAll();
-check('exit finished the chapter', Game.state === 'title', `state=${Game.state} ${at()}`);
+check('exit advanced to chapter 2', advanced && Game.chapterIdx === 1, `idx=${Game.chapterIdx} ${at()}`);
 
 console.log(failures === 0 ? '\nALL PASS' : `\n${failures} FAILURE(S)`);
 process.exit(failures === 0 ? 0 : 1);

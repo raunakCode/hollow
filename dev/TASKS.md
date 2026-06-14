@@ -64,8 +64,28 @@ death-reset rule, set palette/mood/bg, playtest start-to-finish twice.
   crouch under the fence → exit. Added crouch collision-shrink (the engine had
   none) so squeeze-under-gaps works. Test map moved to dev/testmap.js; new
   dev/ch1.js walks the whole chapter. See STATUS.
-- [ ] **T7. Ch. 2 — THE FENCE** (searchlights).
-- [ ] **T8. Ch. 3 — THE YARD** (boxes/plates/lift intro).
+- [x] **T7. Ch. 2 — THE FENCE** (searchlights). Built + machine-verified
+  session 9 (awaiting user feel sign-off). Three sweeping lights in the rain:
+  yard dash/crouch-in-grass → checkpoint → time the mantle past Light 2 →
+  Light 3 box-as-rolling-shield to pull the gate lever from a standing shadow →
+  checkpoint → exit into the facility. Light cones now raycast occluders so the
+  box casts a real, visible shadow (render fix). New dev/ch2.js walks it. See
+  STATUS.
+- [x] **T8. Ch. 3 — THE YARD** (boxes/plates/lift intro). Built + machine-verified
+  session 10 (awaiting user feel sign-off). Interior, no hazards. Room A: two-plate
+  `all` latched gate solved with the box as the second weight. Room B: counterweight
+  lift — box sinks platform A to raise+hold B, hop up + mantle a 4-tile plateau
+  (box can't reach the face, so the lift is required). Room C: lift again to a ledge
+  plate that latches the exit gate, then a stairwell down. New `dev/ch3.js` walks it
+  all (plus bypass/no-cheese guards). Geometry fixes: a 1-tile air gap beside each
+  raised platform makes it mountable; the harness climb now holds jump for full
+  height (variable-jump gotcha). See STATUS.
+  **Reworked session 12** (Rooms B/C were the same puzzle): added the lift BRAKE
+  (`lift.lock`) and rebuilt the lift half as two distinct puzzles — Room B = the
+  basic counterweight lift, Room C = THE CRANE (crate cranks B up, a ceiling
+  girder makes the clamp un-mountable, brake B at a mid height to climb it).
+  Found the brake can't be made necessary by a player's own body (empty-holds +
+  pogo) — it needs a crate. Map is now 95×24. See dev/CH3_REWORK.md + STATUS.
 - [ ] **T9. Ch. 4 — THE DRAINS** (water/breath).
 - [ ] **T10. Ch. 5 — THE HUSKS** (helm intro, desync puzzles).
 - [ ] **T11. Ch. 6 — THE MACHINES** (husks × lights × lifts × timed plates).
@@ -89,3 +109,5 @@ death-reset rule, set palette/mood/bg, playtest start-to-finish twice.
 - 2026-06-11 — T3 systems (levers/doors/lights/helm-husks/lifts/Listener/save) + most of T4 entity rendering + round-2 audio/visual fixes (sessions 2–3). Session 3 fixed the lift geometry (independent aw/bw widths, widened pit B), the Listener charge test, and box buoyancy (spring-to-surface) — headless 65/65, fuzz 8-seed clean, browser clean. T3/T4 left unchecked pending human feel/audio sign-off (see STATUS).
 - 2026-06-12 — T5 done: light.offWhen, breath/drown + porthole, scripted chase trigger, pause menu, title continue/new-game, M-mute. Fixed spawnEntities non-determinism (seeded RNG + per-creature rng). New dev/t5.js + dev/t5-visual.js. headless ALL PASS, t5 ALL PASS, fuzz CLEAN, browser clean over http.
 - 2026-06-12 — T2/T3/T4 signed off by user (test-map feel/audio pass). T6 done: Ch.1 THE FOREST built. Added crouch collision-shrink (CROUCH_H, feet-anchored + ceiling check) + hint caption rendering (was the last T4 TODO). Moved TEST GROUNDS to dev/testmap.js (harnesses load it before game.js; real LEVELS[0] is now Ch.1). New dev/ch1.js (16 checks, ALL PASS). headless/t5 ALL PASS, fuzz CLEAN, browser smoke PASS (whitelisted the expected file:// audio fallbacks).
+- 2026-06-13 — T7 done: Ch.2 THE FENCE (searchlights) built; light cones now raycast occluders so a pushed box casts a real shadow; Light 3 rebuilt as a cheese-proof two-stage gate-house (9b). T8 done: Ch.3 THE YARD (boxes/plates/lift intro) built — 3 rooms (two-plate gate, counterweight lift to a plateau, lift+plate exit gate). New dev/ch3.js walks it (+ bypass/no-cheese guards). Geometry: 1-tile air gap makes raised platforms mountable; harness climb holds jump for full height (variable-jump gotcha). Updated dev/ch2.js exit assertion (Ch.2 → Ch.3 now). headless/t5/ch1/ch2/ch3 ALL PASS, fuzz CLEAN, browser render of all 3 rooms clean.
+- 2026-06-14 — session 11: planned the Ch.3 lift-half rework (dev/CH3_REWORK.md) + implemented the lift BRAKE engine feature (lift.lock freezes a lift). session 12: shipped the rework — Room B = basic counterweight lift, Room C = THE CRANE (crate cranks B up, ceiling girder makes the clamp un-mountable, brake at a mid height). Found the brake can't be made necessary by a player's body (empty-holds + pogo) → needs a crate; deviated from the plan's body-driven Room B accordingly. Map rebuilt 95×24 via a column generator; dev/ch3.js rewritten. headless/t5/ch1/ch2/ch3 ALL PASS, fuzz CLEAN, Ch.3 browser render clean (0 errors).

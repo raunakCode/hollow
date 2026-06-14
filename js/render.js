@@ -328,7 +328,27 @@ const Render = {
     ctx.fill();
   },
 
-  lightCone(ctx, Lt, cam) {
+  // distance from the fixture (wx,wy) along `ang` to the first occluder
+  // (solid tile, box, or closed door) within maxLen — same occluders the
+  // detection raycast in updateLights() uses, so the visible shadow matches
+  // exactly where the player is actually hidden.
+  _coneRayHit(level, world, wx, wy, ang, maxLen) {
+    const cs = Math.cos(ang), sn = Math.sin(ang);
+    for (let d = 8; d <= maxLen; d += 5) {
+      const sx = wx + cs * d, sy = wy + sn * d;
+      if (level && isSolidTile(tileAt(level, Math.floor(sx / TILE), Math.floor(sy / TILE)))) return d;
+      if (world) {
+        for (const b of world.boxes) if (sx > b.x && sx < b.x + b.w && sy > b.y && sy < b.y + b.h) return d;
+        for (const dr of world.doors) {
+          const hh = dr.h * (1 - dr.openT);
+          if (hh > 4 && sx > dr.x && sx < dr.x + dr.w && sy > dr.y && sy < dr.y + hh) return d;
+        }
+      }
+    }
+    return maxLen;
+  },
+
+  lightCone(ctx, Lt, cam, level, world) {
     const x = Lt.x - cam.x, y = Lt.y - cam.y;
     // fixture
     ctx.fillStyle = '#05070b';
@@ -341,9 +361,16 @@ const Render = {
     g.addColorStop(0.7, `rgba(190,205,230,${a.toFixed(3)})`);
     g.addColorStop(1, 'rgba(190,205,230,0)');
     ctx.fillStyle = g;
+    // fan of rays across the fov, each stopped at the first occluder: walls
+    // clip the beam and a pushed box carves a visible shadow behind it.
+    const N = Math.max(18, Math.round(Lt.fov / 0.012));
     ctx.beginPath();
     ctx.moveTo(x, y);
-    ctx.arc(x, y, Lt.len, Lt.ang - Lt.fov / 2, Lt.ang + Lt.fov / 2);
+    for (let i = 0; i <= N; i++) {
+      const ra = Lt.ang - Lt.fov / 2 + Lt.fov * (i / N);
+      const d = this._coneRayHit(level, world, Lt.x, Lt.y, ra, Lt.len);
+      ctx.lineTo(x + Math.cos(ra) * d, y + Math.sin(ra) * d);
+    }
     ctx.closePath();
     ctx.fill();
   },
