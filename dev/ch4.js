@@ -299,14 +299,15 @@ for (let i = 0; i < 120; i++) frames(1);
 releaseAll();
 check('cannot pass the shut exit gate', P().x < 145 * TILE && !gateD().open, at() + ` open=${gateD().open}`);
 
-console.log('-- ROOM D: with the gate open, walk through into the exit -> chapter ends');
+console.log('-- ROOM D: with the gate open, walk through the exit -> advances to Ch.5');
 startCh4();
 leverD().on = true; frames(120);                     // open the exit gate
 place(143, 12);
 keyDown('ArrowRight');
-for (let i = 0; i < 200 && Game.state === 'play'; i++) frames(1);
+for (let i = 0; i < 400 && Game.chapterIdx === 3; i++) frames(1);
 releaseAll();
-check('exit finished the chapter (last chapter -> title)', Game.state === 'title', at());
+check('exit advanced to Ch.5 (THE HUSKS)', Game.chapterIdx === 4 && LEVELS[4].name === 'THE HUSKS',
+  `chapterIdx=${Game.chapterIdx} state=${Game.state} ${at()}`);
 
 console.log(failures === 0 ? '\nALL PASS' : `\n${failures} FAILURE(S)`);
 process.exit(failures === 0 ? 0 : 1);

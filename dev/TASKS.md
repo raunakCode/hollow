@@ -97,7 +97,19 @@ death-reset rule, set palette/mood/bg, playtest start-to-finish twice.
   New `dev/ch4.js` walks it all (+ no-bypass/breath-budget guards). Softened B's
   fork and D's side-tunnel vs the DESIGN sketch (deviations recorded in DESIGN).
   Updated `dev/ch3.js` exit assertion (Ch.3 → Ch.4 now). See STATUS.
-- [ ] **T10. Ch. 5 — THE HUSKS** (helm intro, desync puzzles).
+- [x] **T10. Ch. 5 — THE HUSKS** (helm intro, desync puzzles). Built + machine-
+  verified session 14 (awaiting user feel sign-off). First helm chapter; teaches
+  connect/disconnect + desync. Player walks a one-way walkway over sealed husk
+  pits (seen through '-' windows, unreachable); a husk pressing a plate below
+  opens the player's gate above. A: drive the lone husk onto its plate. B: two
+  husks / two plates (`all`) — desync by jumping the lead husk onto a 2-tile step
+  while the trailing one stays on the floor. C: three husks, a 3-tile gap — only
+  the lead husk has runway to clear it on a timed jump; the others fall in safely.
+  Added a small engine feature so a helm controls only its husk **group** (else a
+  later room's helm would move + re-frame finished rooms' husks); default null =
+  all (backward compatible). New `dev/ch5.js` walks it all (+ group isolation,
+  no-bypass, naive-fail guards). Updated `dev/ch4.js` exit assertion (Ch.4 → Ch.5
+  now). See STATUS.
 - [ ] **T11. Ch. 6 — THE MACHINES** (husks × lights × lifts × timed plates).
 - [ ] **T12. Ch. 7 — THE DEEP** (darkness + Listener + chase finale).
 - [ ] **T13. Ch. 8 — THE CORE + ending** (gauntlet, unison-walk ending
@@ -122,3 +134,4 @@ death-reset rule, set palette/mood/bg, playtest start-to-finish twice.
 - 2026-06-13 — T7 done: Ch.2 THE FENCE (searchlights) built; light cones now raycast occluders so a pushed box casts a real shadow; Light 3 rebuilt as a cheese-proof two-stage gate-house (9b). T8 done: Ch.3 THE YARD (boxes/plates/lift intro) built — 3 rooms (two-plate gate, counterweight lift to a plateau, lift+plate exit gate). New dev/ch3.js walks it (+ bypass/no-cheese guards). Geometry: 1-tile air gap makes raised platforms mountable; harness climb holds jump for full height (variable-jump gotcha). Updated dev/ch2.js exit assertion (Ch.2 → Ch.3 now). headless/t5/ch1/ch2/ch3 ALL PASS, fuzz CLEAN, browser render of all 3 rooms clean.
 - 2026-06-14 — session 11: planned the Ch.3 lift-half rework (dev/CH3_REWORK.md) + implemented the lift BRAKE engine feature (lift.lock freezes a lift). session 12: shipped the rework — Room B = basic counterweight lift, Room C = THE CRANE (crate cranks B up, ceiling girder makes the clamp un-mountable, brake at a mid height). Found the brake can't be made necessary by a player's body (empty-holds + pogo) → needs a crate; deviated from the plan's body-driven Room B accordingly. Map rebuilt 95×24 via a column generator; dev/ch3.js rewritten. headless/t5/ch1/ch2/ch3 ALL PASS, fuzz CLEAN, Ch.3 browser render clean (0 errors).
 - 2026-06-15 — session 13: T9 done — Ch.4 THE DRAINS (water/breath) built. 4 rooms (150×24, seed 104): A open pool (swim+jump-out), B flooded corridor w/ four air-pocket chimneys + sunken latch lever that opens the exit grate (breath-managed detour), C box-as-raft to a high pipe, D cistern w/ sunken lever under a guard-grate lid latching the exit gate. New dev/ch4.js (24 checks) drives every beat incl. breath drain/refill, no-bypass and breath-budget guards; needed a position-aware swim controller (read rows[10][col] to breathe at chimneys). Softened B's fork + D's side-tunnel vs DESIGN (deviations recorded). Updated dev/ch3.js exit assertion (Ch.3 → Ch.4). headless/t5/ch1/ch2/ch3/ch4 ALL PASS, fuzz CLEAN (8 seeds), Ch.4 browser render clean (0 errors). Awaiting user feel sign-off.
+- 2026-06-16 — session 14: user signed off Ch.4 feel. T10 done — Ch.5 THE HUSKS (helm intro) built. 3 rooms (172×24, seed 105): player walks a one-way walkway over sealed husk pits ('-' viewing windows); a husk pressing a plate below opens the player's gate above. A: drive the lone husk onto its plate. B: two husks/two plates (`all`) — desync by jumping the lead husk onto a 2-tile step while the trailing one stays on the floor. C: three husks, a 3-tile gap — only the lead husk has runway to clear it on a timed jump; the others fall in safely (mantle the 3-tile wall back). Added a helm-group engine feature (a helm drives only its `group`; default null = all, backward compatible) so a later room's helm doesn't move/re-frame finished rooms' husks. New dev/ch5.js (group isolation + per-room solves + no-bypass + naive-fail guards). Tuned Room C's gap by measuring the jump window in-engine (raised ledge → too tight; flat far ledge → generous ~0.4 s + coyote). Updated dev/ch4.js exit assertion (Ch.4 → Ch.5). headless/t5/ch1–ch5 ALL PASS, fuzz CLEAN, Ch.5 browser render clean (0 errors, 122 fps). Awaiting user feel sign-off.

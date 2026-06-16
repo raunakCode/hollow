@@ -46,13 +46,18 @@ a core puzzle tool. Lights take an optional `offWhen` (a signal id or list of
 ids): while any listed signal is active the cone powers down — no detection,
 dimmed in render (implemented T5).
 
-**Husks + helms**: stand at a helm, press X/E: you slump and *every husk in
-the chapter mirrors your directional input simultaneously*. Disconnect and
-they freeze in place (a husk left on a plate keeps pressing it). Puzzles come
-from desync: walls stop one husk while another keeps walking; gaps that one
-husk falls into and another jumps. Husks use full player physics (jump,
-mantle, swim, push boxes). Never let a husk get unrecoverable — pits they
-fall into need ramps back out, or the puzzle must still be solvable.
+**Husks + helms**: stand at a helm, press X/E: you slump and *every husk the
+helm controls mirrors your directional input simultaneously*. A helm controls
+its **group** (`husk.group`/`helm.group`; a helm with no group controls every
+husk — the simple case). Group husks per room so a later room's helm doesn't
+move (or re-centre the camera on) finished rooms' husks (Ch.5 does this; see
+its built form). Disconnect and the husks freeze in place (a husk left on a
+plate keeps pressing it). Puzzles come from desync: walls/steps that stop one
+husk while another keeps walking; gaps that one husk falls into and another
+jumps; the same jump that climbs one husk leaves another on the floor. Husks use
+full player physics (jump, mantle, swim, push boxes). Never let a husk get
+unrecoverable — pits they fall into need a mantle/ramp back out, or the puzzle
+must still be solvable.
 
 **Counterweight lifts**: two platforms on a rope. Heavier side sinks at
 ~58 px/s per unit of weight difference; equal weight = holds position
@@ -165,13 +170,34 @@ solvable on one breath and non-bypassable is fiddly; the softened forms verify
 cleanly and keep the breath windows generous.)
 
 ### Ch. 5 — THE HUSKS (helm intro; interior bg)
-A: one husk behind a floor gap you can't cross; helm on your side. Connect,
-walk the husk onto a plate, disconnect (it keeps standing there), door
-latches open. B: two husks at different x; two plates. Walking moves both —
-use a wall that stops husk 1 while husk 2 keeps going to desync their
-spacing, then place both. C: three husks, a gap: jump at the moment where
-only the correct husk has runway to clear it; the others bonk a wall or land
-safely below (ramp back up — no softlock). Checkpoints between rooms. Exit.
+Built form (session 14; first HELM chapter — teaches connect/disconnect and
+desync). 172×24, seed 105, asserted in dev/ch5.js. The PLAYER walks a continuous
+one-way walkway (rows 12-13); each room's HUSKS are sealed in a pit below it
+(open rows 14-19, floor row 20), seen through a '-' window but unreachable, so a
+husk pressing a plate down in the pit is the only way to open the player's gate
+above (a latched door on the walkway). Three escalating rooms, deathless (R
+re-racks a wedged husk):
+A — one husk: connect at the helm, drive it onto its plate, the gate latches.
+B — two husks, two plates, gate needs BOTH at once (`all`). One plate is on a
+2-tile step (a husk can only reach it by jumping), the other on the floor. Both
+husks mirror you, so the solve is a DESYNC: jump the lead husk up onto the step
+while the trailing husk is still on open floor (no wall to climb), then walk both
+onto their plates. C — three husks, a 3-tile gap: all mirror you, but only the
+lead husk has the runway to clear the gap on a single timed jump and reach the
+far plate; the others fall into the gap (safe — row 23 floor, a 3-tile wall
+mantles back to the runway) and don't cross. Then the exit (last of levels1).
+Checkpoints between rooms (each past a latched gate, death-reset safe).
+**Deviations from the sketch above** (recorded per the hard rule): (1) The sketch
+implied "every husk in the chapter" mirrors one helm; that can't support the per-
+room A(1)/B(2)/C(3) structure (connecting in a later room would move + re-centre
+the camera on finished rooms' husks). So a helm now controls only its **group**
+of husks (engine: `husk.group`/`helm.group`; default null = all, unchanged for
+testmap/single-helm). (2) The husks live in sealed pits the player overlooks (a
+vertical "floor gap you can't cross") rather than across horizontal gaps, so the
+player and husks never share a route — clean, no player softlock. (3) Room C's
+discrimination is the timed jump (only the lead husk is at the gap lip when you
+jump); the others fall in safely rather than "bonk a wall" — same idea (only the
+right husk crosses, others are recoverable), simpler non-cheesable geometry.
 
 ### Ch. 6 — THE MACHINES (husks + lights + lifts + timed plates)
 A: corridor swept by lights you cannot pass — but husks can. Helm overlooks

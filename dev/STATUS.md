@@ -1,6 +1,81 @@
 # HOLLOW — status
 
-_Last updated: 2026-06-15 (session 13)._
+_Last updated: 2026-06-16 (session 14)._
+
+## Session 14 — Ch.4 feel signed off; T10 (Ch.5 THE HUSKS) built: the HELM chapter
+
+User signed off Ch.4 ("chapter 4 seems pretty good"), so **T9's feel pass is in**.
+Then built **Chapter 5 — THE HUSKS**, the first HELM chapter (connect at a helm,
+the husks mirror you; disconnect, they freeze). 172×24, seed 105, `bg:'interior'`.
+The whole chapter sits on one spatial idea: **the player walks a continuous
+one-way walkway (rows 12-13) over sealed husk pits** (open rows 14-19, floor row
+20) that they see through `-` viewing windows but can never enter — so a husk
+pressing a plate down in the pit is the only way to open the player's latched
+gate up on the walkway. Three rooms, one idea each, deathless (no hazards; R
+re-racks a wedged husk). Authored geometry with a throwaway column generator
+(`dev/_gen_ch5.js`, deleted) and validated every beat by driving the engine in
+the new `dev/ch5.js`.
+
+- **Engine feature first — helm husk groups.** The existing helm controlled
+  *all* `world.husks` and the camera followed *all* husks' centroid. That can't
+  support a per-room A(1)/B(2)/C(3) layout — connecting in room C would also move
+  rooms A/B's husks and yank the camera to the level's middle. Added
+  `husk.group`/`helm.group`: a helm drives only its group; **default `null` =
+  controls all husks (unchanged for the testmap + any single-helm chapter)**.
+  New `controlledHusks()` (game.js) is used by the mirror loop, the box-push
+  loop, `updateCamera` (centroid), `drawPlay` (connected glow), and the connect
+  guard. Additive + backward-compatible — full existing suite stayed green.
+- **ROOM A — the remote weight.** Connect at the helm, drive the lone husk onto
+  its plate (pA); the gate (on the walkway) latches; disconnect and walk through.
+  | checkpoint 0.
+- **ROOM B — the desync (two husks, two plates, `all`).** One plate is on a
+  **2-tile step** a husk can only reach by jumping; the other is on the floor.
+  Both husks mirror you, so you must **desync**: jump the *lead* husk up onto the
+  step while the *trailing* husk is still on open floor (no wall to climb), then
+  walk both onto their plates → both pressed at once → gate latches. Naively
+  walking both right (no jump) piles them on the floor — only one plate — gate
+  stays shut (asserted). | checkpoint 1.
+- **ROOM C — the timed runway jump (three husks, a 3-tile gap).** All three
+  mirror you, but only the **lead** husk has the runway to clear the gap on a
+  single timed jump and reach the far plate (pC); the trailing two fall into the
+  gap — **safe** (row-23 floor; a 3-tile wall mantles back to the runway) — and
+  don't cross. Gate latches; disconnect; walk out the exit (last of levels1).
+  | checkpoint 2.
+- **Room C tuning lesson (measure in-engine again).** First built the far ledge
+  one tile *higher* than the runway (a 4-tile gap-side wall, so a fallen husk
+  couldn't mantle *up* to it — a clean no-fall-up-bypass). But that made the jump
+  window brutal: the husk had to arrive at the raised ledge still high, so a jump
+  even ~1 tile early landed short — a ~0.06 s window. Dropped the far ledge to the
+  runway level and scanned the jump window in-engine: now jumping anywhere from
+  ~col 119.75 to past the lip succeeds (~0.4 s + coyote), and jumping too early
+  fails *safely* (husk drops into the gap). Accepted that a player could
+  alternatively fall a husk in and mantle the 3-tile far wall up to the ledge —
+  a benign emergent solve, not a cheese (still needs helm control).
+- **Three DESIGN deviations recorded** (per the hard rule): (1) a helm controls
+  its *group*, not literally "every husk in the chapter"; (2) husks live in
+  sealed *pits the player overlooks* (a vertical gap) rather than across
+  horizontal gaps, so player/husk routes never collide (no player softlock);
+  (3) Room C's losers *fall in safely* rather than "bonk a wall" — same "only the
+  right husk crosses, others recoverable" idea, simpler non-cheesable geometry.
+- **`dev/ch4.js` exit assertion updated:** Ch.4 is no longer the last chapter, so
+  its exit now advances to Ch.5 (asserts `chapterIdx===4`). Ch.5's exit is the
+  new last-chapter→title.
+- **Verified:** `node dev/headless.js` / `t5.js` / `ch1.js` / `ch2.js` / `ch3.js`
+  / `ch4.js` ALL PASS, `node dev/fuzz.js` FUZZ CLEAN (8 seeds), **`node dev/ch5.js`
+  ALL PASS** (level sanity; helm-group isolation — driving room B leaves rooms
+  A & C husks frozen; A remote-plate solve + player-can't-open-alone; B naive-walk
+  fails / desync solve lands one husk on the step + one on the floor + latches; C
+  player-can't-open-alone + only one husk crosses to pC + the other two stay in
+  the gap; exit→title). Browser render of all three rooms **clean (0 console
+  errors, 122 fps)**; gate A opened from a live husk-drive, and brightened
+  connected-camera shots show the pit + step (one husk low, one up on the step)
+  and the gap reading correctly.
+- **Still needs the user (Ch.5 feel sign-off):** play THE HUSKS. Does connecting
+  at a helm and seeing the husk below "click" (the `-` window + camera drop)? Is
+  Room B's desync — *jump the near husk up while the far one's still on the floor*
+  — discoverable without text, and is the jump timing fair? Is Room C's
+  "only the one with runway clears it; the others fall in (safe)" readable, and is
+  the gap-jump window comfortable? Machine-verified ≠ feel-verified.
 
 ## Session 13 — T9 (Ch.4 THE DRAINS) built: the WATER / BREATH chapter
 

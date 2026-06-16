@@ -29,6 +29,16 @@ const Game = {
 const BREATH_MAX = 9;        // seconds the player can hold their breath
 const BREATH_WARN = 4;       // below this the screen starts closing in
 
+// Husks the currently-connected helm drives. A helm with no group controls
+// every husk (original behaviour); a grouped helm controls only its own group,
+// so finished rooms' husks stay frozen and out of the camera centroid.
+function controlledHusks() {
+  const hm = Game.helmed;
+  if (!hm || !Game.world) return [];
+  if (hm.group == null) return Game.world.husks;
+  return Game.world.husks.filter(h => h.group === hm.group);
+}
+
 // --------------------------- save / load ----------------------------
 
 const SAVE_KEY = 'hollow_save';
@@ -108,13 +118,14 @@ function die(byHazard) {
 
 function updateCamera(dt, snap) {
   const cam = Game.cam;
-  // focus: player, or the husk centroid while connected to a helm
+  // focus: player, or the controlled-husk centroid while connected to a helm
   let fx, fy, lookDir;
-  if (Game.helmed && Game.world.husks.length) {
+  const ch = controlledHusks();
+  if (ch.length) {
     fx = 0; fy = 0;
-    for (const h of Game.world.husks) { fx += h.x + h.w / 2; fy += h.y + h.h / 2; }
-    fx /= Game.world.husks.length; fy /= Game.world.husks.length;
-    lookDir = Game.world.husks[0].facing;
+    for (const h of ch) { fx += h.x + h.w / 2; fy += h.y + h.h / 2; }
+    fx /= ch.length; fy /= ch.length;
+    lookDir = ch[0].facing;
   } else {
     const p = Game.player;
     fx = p.x + p.w / 2; fy = p.y + p.h / 2;
@@ -151,20 +162,23 @@ function updatePlay(dt) {
   if (Input.actPressed()) updateActInteraction(p, world);
 
   const idle = { left: false, right: false, up: false, down: false, jump: false, jumpHeld: false };
-  // while helmed the player slumps and every husk mirrors your input
+  // while helmed the player slumps and the connected helm's husks mirror your
+  // input; husks of other groups (finished rooms) stay frozen
   const playerCtl = Game.helmed ? { ...idle, down: true } : ctl;
-  const huskCtl = Game.helmed ? ctl : idle;
+  const controlled = controlledHusks();
 
   const wasInWater = p.inWater;
   updateHumanoid(p, playerCtl, dt, level, collectSolids(world, p), true);
   maybeSplash(p, wasInWater, dt);
 
   for (const h of world.husks) {
+    const driven = controlled.includes(h);
+    const huskCtl = driven ? ctl : idle;
     const hWasInWater = h.inWater;
     updateHumanoid(h, huskCtl, dt, level, collectSolids(world, h), false);
     maybeSplash(h, hWasInWater, dt);
     // husks push boxes like the player does (no grab — X/E is the helm key)
-    if (Game.helmed && h.grounded && !h.inWater &&
+    if (driven && h.grounded && !h.inWater &&
         h.lastHitX && world.boxes.includes(h.lastHitX) &&
         ((h.facing > 0 && huskCtl.right) || (h.facing < 0 && huskCtl.left))) {
       h.lastHitX.vx = h.facing * 70;
@@ -289,7 +303,11 @@ function updateActInteraction(p, world) {
   }
   const reach = { x: p.x - 6, y: p.y - 4, w: p.w + 12, h: p.h + 8 };
   for (const hm of world.helms) {
-    if (aabb(reach, hm) && world.husks.length) {
+    if (!aabb(reach, hm)) continue;
+    // only connect if this helm actually has husks to drive
+    const has = hm.group == null ? world.husks.length
+      : world.husks.some(h => h.group === hm.group);
+    if (has) {
       Game.helmed = hm;
       AudioSys.connect();
       return;
@@ -374,8 +392,9 @@ function drawPlay(dt) {
   for (const b of Game.world.boxes) Render.box(ctx, b, cam);
   for (const cr of Game.world.creatures) Render.creature(ctx, cr, cam, Game.time);
   Render.water(ctx, Game.level, cam, Game.time);
+  const drivenSet = controlledHusks();
   for (const h of Game.world.husks)
-    Render.humanoid(ctx, h, cam, { huskGlow: true, connected: !!Game.helmed });
+    Render.humanoid(ctx, h, cam, { huskGlow: true, connected: drivenSet.includes(h) });
   Render.humanoid(ctx, Game.player, cam, {});
   for (const ht of Game.world.hints) Render.hint(ctx, ht, cam);
   for (const Lt of Game.world.lights) Render.lightCone(ctx, Lt, cam, Game.level, Game.world);

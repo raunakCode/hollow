@@ -46,11 +46,17 @@ function spawnEntities(defs, seed) {
       case 'husk': {
         const h = makeHumanoid(px + 7, py + TILE - 42);
         h.isHusk = true;
+        h.group = d.group || null;   // which helm controls it (null = any helm)
         w.husks.push(h);
         break;
       }
       case 'helm':
-        w.helms.push({ x: px, y: py, w: TILE, h: TILE * 2, glow: 0 });
+        // group: a helm only controls husks whose group matches (null group =
+        // controls ALL husks — the original behaviour, kept for the testmap and
+        // single-helm chapters). Lets a chapter pen each room's husks under
+        // their own helm so connecting in one room doesn't move (or re-centre
+        // the camera on) the husks left behind in finished rooms.
+        w.helms.push({ x: px, y: py, w: TILE, h: TILE * 2, glow: 0, group: d.group || null });
         break;
       case 'lift':
         w.lifts.push({

@@ -11,8 +11,8 @@ js/audio.js     AudioSys: procedural ambience + one-shot SFX
 js/player.js    tile queries, moveEntity physics, makeHumanoid/updateHumanoid
 js/entities.js  spawnEntities, collectSolids, per-system update functions
 js/render.js    Render: backgrounds, tiles, humanoid drawing, post fx
-js/levels1.js   chapters 1–4 — defines global LEVELS = [] and pushes onto it
-                (Ch.1 FOREST, Ch.2 FENCE, Ch.3 YARD, Ch.4 DRAINS all live)
+js/levels1.js   chapters 1–5 — defines global LEVELS = [] and pushes onto it
+                (Ch.1 FOREST, Ch.2 FENCE, Ch.3 YARD, Ch.4 DRAINS, Ch.5 HUSKS)
 dev/testmap.js  DEV-ONLY all-mechanics TEST GROUNDS sheet. Not in index.html;
                 the harnesses load it after levels2.js / before game.js, where
                 it does LEVELS.length=0 + push() to replace the chapter list.
@@ -27,9 +27,10 @@ Chromium smoke test of index.html itself (setup notes in its header);
 `dev/fuzz.js` — random-input fuzzer that flags embed/stuck states
 (player-in-tiles, player-deep-in-box, box-in-tiles). Run all three
 after engine changes. Per-chapter walkthrough harnesses load the REAL
-`LEVELS` (no testmap) and drive every beat: `dev/ch1.js` … `dev/ch4.js`
-(`ch4.js` covers the water/breath chapter — swim+jump-out, breath
-drain/air-pocket refill, the two sunken latch levers/grates, the box raft).
+`LEVELS` (no testmap) and drive every beat: `dev/ch1.js` … `dev/ch5.js`
+(`ch4.js` covers the water/breath chapter; `ch5.js` covers the helm chapter —
+helm-group isolation, the room-A remote plate, room-B two-husk jump desync, and
+room-C's timed runway jump over the gap).
 
 No modules, no fetch — everything is global-scope script, must run from
 `file://`. Canvas is 960×540 (`VIEW_W/VIEW_H`), letterboxed via `fitCanvas`.
@@ -63,8 +64,8 @@ Game.js should derive `level = { w, h, rows }` from this (`w` = row length,
 {t:'lever', x,y, id:'id', on:false}
 {t:'plate', x,y, id:'id', w:2, hold:0}        // y = tile the plate sits IN (top of floor)
 {t:'light', x,y, a0,a1, speed:0.5, phase:0, len:11, fov:0.30, offWhen:'id'}  // angles in radians; y/x = fixture tile. offWhen: signal id that powers the cone DOWN (disabled = no detection, dims in render)
-{t:'husk',  x,y}                               // y = tile whose bottom is the feet
-{t:'helm',  x,y}                               // 1×2-tile interaction zone
+{t:'husk',  x,y, group:'a'}                    // y = tile whose bottom is the feet; group = which helm drives it (default null)
+{t:'helm',  x,y, group:'a'}                    // 1×2-tile interaction zone; controls husks of its group (null group = ALL husks)
 {t:'lift',  ax,ay, bx,by, w:2, travel:3, off:0, lock:'id'}  // counterweight: A at ay-off, B at by+off
                                                // w sets both platform widths; or aw/bw to size each
                                                // lock: signal id (lever/plate) that FREEZES the lift (the brake) while active
@@ -238,8 +239,13 @@ breath, paused, pauseSel, titleSel}`. Consts: `BREATH_MAX=9`, `BREATH_WARN=4`.
   saved checkpoint's coords. Checkpoint placement rules in DESIGN.md.
 - Husks: `h.isHusk = true`; they ignore searchlights; player and husks do
   NOT collide with each other (don't add them to each other's solids).
-- While connected to a helm: route Input ctl to every husk, give player
-  all-false ctl, camera follows husk centroid.
+- While connected to a helm: route Input ctl to the helm's husks (see groups
+  below), give player all-false ctl (a `down` slump), camera follows the
+  controlled-husk centroid. `controlledHusks()` (game.js) returns them: a helm
+  with `group==null` drives ALL husks (original behaviour — testmap, single-helm
+  chapters); a grouped helm drives only `husks` of the same `group`, so a later
+  room's helm leaves finished rooms' husks frozen and out of the camera centroid.
+  Used by Ch.5 (one group per room). Husks of other groups get idle ctl.
 - Boxes are 30×30 spawned 1px inset in their tile; their solidity for
   humanoids comes from `collectSolids`.
 - One-way `-` tiles only catch falling entities whose feet were above them.
