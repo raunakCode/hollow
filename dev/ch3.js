@@ -11,7 +11,7 @@
 //     clamp; a ceiling girder makes the clamp UN-mountable so you must BRAKE B
 //     (lever brkC, real X interaction) at a mid height to bridge; the lock
 //     holds under load and releases; full crane solve (crate drives, brake, mount).
-//   Then the exit ends the chapter (last chapter -> title). Run `node dev/ch3.js`.
+//   Then the exit advances to Ch.4 (THE DRAINS). Run `node dev/ch3.js`.
 // ---------------------------------------------------------------
 'use strict';
 
@@ -317,13 +317,13 @@ place(74);                                     // to the divider, beside the gap
 const solvedC = climbRight(260, () => P().y < PLATEAU + 6 && P().x > 79 * TILE && P().grounded);
 check('crane solved: mid-braked B is mountable to the exit ledge', solvedC, at());
 
-console.log('-- reach the exit -> chapter ends (last chapter -> title)');
+console.log('-- reach the exit -> advances to Ch.4 (Ch.3 is no longer the last chapter)');
 startCh3();
 place(88);                                     // foot of the Room C exit stairs
 keyDown('ArrowRight');
-for (let i = 0; i < 400 && Game.state === 'play'; i++) frames(1);
+for (let i = 0; i < 400 && Game.chapterIdx === 2; i++) frames(1);
 releaseAll();
-check('exit finished the chapter (returned to title)', Game.state === 'title', `state=${Game.state} ${at()}`);
+check('exit advanced to Ch.4 (THE DRAINS)', Game.chapterIdx === 3, `chapterIdx=${Game.chapterIdx} state=${Game.state} ${at()}`);
 
 console.log(failures === 0 ? '\nALL PASS' : `\n${failures} FAILURE(S)`);
 process.exit(failures === 0 ? 0 : 1);

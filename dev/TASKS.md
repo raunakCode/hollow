@@ -86,7 +86,17 @@ death-reset rule, set palette/mood/bg, playtest start-to-finish twice.
   girder makes the clamp un-mountable, brake B at a mid height to climb it).
   Found the brake can't be made necessary by a player's own body (empty-holds +
   pogo) — it needs a crate. Map is now 95×24. See dev/CH3_REWORK.md + STATUS.
-- [ ] **T9. Ch. 4 — THE DRAINS** (water/breath).
+- [x] **T9. Ch. 4 — THE DRAINS** (water/breath). Built + machine-verified
+  session 13 (awaiting user feel sign-off). First water chapter; teaches swim,
+  jump-out, and the breath timer/porthole/drown (breath engine was T5). Four
+  rooms (150×24, seed 104): A open pool (swim + jump-out, no drowning); B flooded
+  corridor under a roof with four air-pocket chimneys — the exit grate is shut so
+  you detour to a sunken latch lever (pulled underwater), a breath-managed plan;
+  C float the box as a raft to reach a high pipe (unreachable from water); D a
+  cistern with a sunken lever under a guard-grate lid that latches the exit gate.
+  New `dev/ch4.js` walks it all (+ no-bypass/breath-budget guards). Softened B's
+  fork and D's side-tunnel vs the DESIGN sketch (deviations recorded in DESIGN).
+  Updated `dev/ch3.js` exit assertion (Ch.3 → Ch.4 now). See STATUS.
 - [ ] **T10. Ch. 5 — THE HUSKS** (helm intro, desync puzzles).
 - [ ] **T11. Ch. 6 — THE MACHINES** (husks × lights × lifts × timed plates).
 - [ ] **T12. Ch. 7 — THE DEEP** (darkness + Listener + chase finale).
@@ -111,3 +121,4 @@ death-reset rule, set palette/mood/bg, playtest start-to-finish twice.
 - 2026-06-12 — T2/T3/T4 signed off by user (test-map feel/audio pass). T6 done: Ch.1 THE FOREST built. Added crouch collision-shrink (CROUCH_H, feet-anchored + ceiling check) + hint caption rendering (was the last T4 TODO). Moved TEST GROUNDS to dev/testmap.js (harnesses load it before game.js; real LEVELS[0] is now Ch.1). New dev/ch1.js (16 checks, ALL PASS). headless/t5 ALL PASS, fuzz CLEAN, browser smoke PASS (whitelisted the expected file:// audio fallbacks).
 - 2026-06-13 — T7 done: Ch.2 THE FENCE (searchlights) built; light cones now raycast occluders so a pushed box casts a real shadow; Light 3 rebuilt as a cheese-proof two-stage gate-house (9b). T8 done: Ch.3 THE YARD (boxes/plates/lift intro) built — 3 rooms (two-plate gate, counterweight lift to a plateau, lift+plate exit gate). New dev/ch3.js walks it (+ bypass/no-cheese guards). Geometry: 1-tile air gap makes raised platforms mountable; harness climb holds jump for full height (variable-jump gotcha). Updated dev/ch2.js exit assertion (Ch.2 → Ch.3 now). headless/t5/ch1/ch2/ch3 ALL PASS, fuzz CLEAN, browser render of all 3 rooms clean.
 - 2026-06-14 — session 11: planned the Ch.3 lift-half rework (dev/CH3_REWORK.md) + implemented the lift BRAKE engine feature (lift.lock freezes a lift). session 12: shipped the rework — Room B = basic counterweight lift, Room C = THE CRANE (crate cranks B up, ceiling girder makes the clamp un-mountable, brake at a mid height). Found the brake can't be made necessary by a player's body (empty-holds + pogo) → needs a crate; deviated from the plan's body-driven Room B accordingly. Map rebuilt 95×24 via a column generator; dev/ch3.js rewritten. headless/t5/ch1/ch2/ch3 ALL PASS, fuzz CLEAN, Ch.3 browser render clean (0 errors).
+- 2026-06-15 — session 13: T9 done — Ch.4 THE DRAINS (water/breath) built. 4 rooms (150×24, seed 104): A open pool (swim+jump-out), B flooded corridor w/ four air-pocket chimneys + sunken latch lever that opens the exit grate (breath-managed detour), C box-as-raft to a high pipe, D cistern w/ sunken lever under a guard-grate lid latching the exit gate. New dev/ch4.js (24 checks) drives every beat incl. breath drain/refill, no-bypass and breath-budget guards; needed a position-aware swim controller (read rows[10][col] to breathe at chimneys). Softened B's fork + D's side-tunnel vs DESIGN (deviations recorded). Updated dev/ch3.js exit assertion (Ch.3 → Ch.4). headless/t5/ch1/ch2/ch3/ch4 ALL PASS, fuzz CLEAN (8 seeds), Ch.4 browser render clean (0 errors). Awaiting user feel sign-off.

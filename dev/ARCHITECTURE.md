@@ -12,7 +12,7 @@ js/player.js    tile queries, moveEntity physics, makeHumanoid/updateHumanoid
 js/entities.js  spawnEntities, collectSolids, per-system update functions
 js/render.js    Render: backgrounds, tiles, humanoid drawing, post fx
 js/levels1.js   chapters 1–4 — defines global LEVELS = [] and pushes onto it
-                (Ch.1 FOREST, Ch.2 FENCE, Ch.3 YARD live; Ch.4 appended as built)
+                (Ch.1 FOREST, Ch.2 FENCE, Ch.3 YARD, Ch.4 DRAINS all live)
 dev/testmap.js  DEV-ONLY all-mechanics TEST GROUNDS sheet. Not in index.html;
                 the harnesses load it after levels2.js / before game.js, where
                 it does LEVELS.length=0 + push() to replace the chapter list.
@@ -26,7 +26,10 @@ map (run `node dev/headless.js`); `dev/browser-test.js` — headless-
 Chromium smoke test of index.html itself (setup notes in its header);
 `dev/fuzz.js` — random-input fuzzer that flags embed/stuck states
 (player-in-tiles, player-deep-in-box, box-in-tiles). Run all three
-after engine changes.
+after engine changes. Per-chapter walkthrough harnesses load the REAL
+`LEVELS` (no testmap) and drive every beat: `dev/ch1.js` … `dev/ch4.js`
+(`ch4.js` covers the water/breath chapter — swim+jump-out, breath
+drain/air-pocket refill, the two sunken latch levers/grates, the box raft).
 
 No modules, no fetch — everything is global-scope script, must run from
 `file://`. Canvas is 960×540 (`VIEW_W/VIEW_H`), letterboxed via `fitCanvas`.

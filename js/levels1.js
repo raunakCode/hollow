@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------
 // HOLLOW - levels1.js : chapters 1-4
-// Ch.1 (THE FOREST), Ch.2 (THE FENCE) and Ch.3 (THE YARD) are live below;
-// Ch.4 is appended when built.
+// Ch.1 (THE FOREST), Ch.2 (THE FENCE), Ch.3 (THE YARD) and Ch.4 (THE DRAINS)
+// are all live below.
 // The TEST GROUNDS mechanics sheet now lives in dev/testmap.js (dev-only,
 // loaded by the harnesses) so this file is the real game.
 // ---------------------------------------------------------------
@@ -228,5 +228,98 @@ LEVELS.push({
     { t: 'lift', ax: 70, ay: 20, bx: 76, by: 20, aw: 2, bw: 3, travel: 3, lock: 'brkC' },
     { t: 'lever', x: 73, y: 19, id: 'brkC' },          // the brake handle (crane operator)
     { t: 'exit', x: 90, y: 19, w: 2, h: 4 },           // past the exit ledge, down the stairs
+  ],
+});
+
+// -- Ch.4 — THE DRAINS -------------------------------------------
+// First WATER chapter: teaches swimming, the jump-out-near-surface window, and
+// the BREATH timer (~9 s submerged, the view closes to a porthole, then you
+// drown). Dim interior cistern. Walk/through-line is row 12. Four rooms, each
+// one idea, escalating (see dev/DESIGN.md Ch.4 + the geometry was built with a
+// throwaway column generator — never hand-count the 150-char rows):
+//   ROOM A — THE POOL (cols 0-30). Walk off the start deck into a deep OPEN
+//     pool (surface row 12, always surfaceable -> no drowning), swim across and
+//     down, and jump out onto the flush far bank. Pure swim + jump-out teach.
+//     | checkpoint 0 (27, the far bank).
+//   ROOM B — THE FLOODED CORRIDOR (cols 31-84). A submerged tunnel under a
+//     5-tile roof (rows 8-12): you swim it head-underwater (breath drains),
+//     surfacing at four air-pocket chimneys (cols 40-41, 52-53, 64-65, 76-77)
+//     that vent to the surface. The exit chimney (82-84) up to the Room-C ledge
+//     is sealed by a GRATE (door gB, col 81). The grate's latch lever (gB) is
+//     SUNK on the corridor floor far to the left (col 58, row 20): you can't
+//     just rush the exit — dive to the lever (a managed breath-leg), pull it
+//     (the grate latches open), then route back through the chimneys to the now-
+//     open exit shaft and rise to the ledge. The plan (which pockets chain to
+//     the lever and back to the exit on one breath) is the puzzle. | checkpoint
+//     1 (88, the Room-C ledge, past the grate).
+//   ROOM C — THE RAFT (cols 85-114). A box waits on the dry ledge (96); a high
+//     pipe ledge (cols 102-114, top row 9) is the only way on, but it's 3 tiles
+//     above the pool surface — too high to jump out of the water onto, and you
+//     can't mantle FROM water. Push the box into the narrow pool (100-101); it
+//     floats as a raft; climb onto it and mantle the pipe from there (the box's
+//     +1 tile is exactly what bridges it). | checkpoint 2 (108, the pipe ledge).
+//   ROOM D — THE CISTERN (cols 115-148). Drop off the pipe ledge into a deep
+//     cistern. The exit is a flush ledge on the right (143-148) but its gate
+//     (door gD, col 144) is shut. Its latch lever (gD) is sunk in a pocket
+//     (cols 123-128, row 20) capped by a guard GRATE (the lid, row 18) so you
+//     can't drop straight onto it — descend beside it and swim in along the
+//     floor. Pull it (the exit gate latches open), surface, jump out onto the
+//     ledge, walk through the gate to the exit. Climb out of the drains.
+//   Every beat, the breath budget, and the no-bypass properties (grate shut
+//   until its lever; pipe unreachable without the raft; lever pocket unreachable
+//   straight-down) are asserted in dev/ch4.js — tweak there if you move a
+//   fixture. Checkpoints sit on every dry "surface chamber" (death-reset safe:
+//   each is past a finished/latched stretch).
+LEVELS.push({
+  name: 'THE DRAINS',
+  bg: 'interior',
+  seed: 104,
+  palette: { sky0: '#04060a', sky1: '#0c121b', horizonGlow: 'rgba(90,120,140,0.06)' },
+  mood: { drone: 0.09, wind: 0.0, rain: 0.0, pitch: 42 },
+  rain: false,
+  dark: false,
+  rows: [
+    ".....................................................................................................................................................#",
+    ".....................................................................................................................................................#",
+    ".....................................................................................................................................................#",
+    ".....................................................................................................................................................#",
+    ".....................................................................................................................................................#",
+    ".....................................................................................................................................................#",
+    ".....................................................................................................................................................#",
+    ".....................................................................................................................................................#",
+    "..................................######..##########..##########..##########..####...................................................................#",
+    "..................................######..##########..##########..##########..####....................#############..................................#",
+    "..................................######..##########..##########..##########..####....................#############..................................#",
+    "..................................######..##########..##########..##########..####....................#############..................................#",
+    "########~~~~~~~~~~~~~~~~~######...######..##########..##########..##########..####~~~###############~~#############~~~~~~~~~~~~~~~~~~~~~~~~~~~~#######",
+    "########~~~~~~~~~~~~~~~~~######~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~###############~~#############~~~~~~~~~~~~~~~~~~~~~~~~~~~~#######",
+    "########~~~~~~~~~~~~~~~~~######~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~###############~~#############~~~~~~~~~~~~~~~~~~~~~~~~~~~~#######",
+    "########~~~~~~~~~~~~~~~~~######~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~###############~~#############~~~~~~~~~~~~~~~~~~~~~~~~~~~~#######",
+    "########~~~~~~~~~~~~~~~~~######~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~###############~~#############~~~~~~~~~~~~~~~~~~~~~~~~~~~~#######",
+    "########~~~~~~~~~~~~~~~~~######~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~###############~~#############~~~~~~~~~~~~~~~~~~~~~~~~~~~~#######",
+    "########~~~~~~~~~~~~~~~~~######~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~###############~~#############~~~~~~~########~~~~~~~~~~~~~#######",
+    "###############################~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~###############~~#############~~~~~~~~~~~~~~~~~~~~~~~~~~~~#######",
+    "###############################~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~###############~~#############~~~~~~~~~~~~~~~~~~~~~~~~~~~~#######",
+    "######################################################################################################################################################",
+    "######################################################################################################################################################",
+    "######################################################################################################################################################",
+  ],
+  playerStart: [3, 11],
+  entities: [
+    { t: 'hint', x: 14, y: 14, text: '↑' },            // swim up / jump out of the pool
+    // ROOM A — open pool (no entities, just the swim + the checkpoint)
+    { t: 'check', x: 27, y: 10, idx: 0 },              // the far bank, past the pool
+    // ROOM B — flooded corridor: sunken lever opens the exit grate
+    { t: 'hint', x: 58, y: 17, text: 'X' },            // the sunken grate lever
+    { t: 'lever', x: 58, y: 20, id: 'gB' },            // on the corridor floor (dive to it)
+    { t: 'door', x: 81, y: 13, h: 8, links: ['gB'], latch: true },   // exit grate
+    { t: 'check', x: 88, y: 10, idx: 1 },              // the Room-C ledge, past the grate
+    // ROOM C — float the box as a raft to reach the high pipe ledge
+    { t: 'box', x: 96, y: 11 },                        // push into the pool -> raft
+    { t: 'check', x: 108, y: 7, idx: 2 },              // the pipe ledge, past the raft
+    // ROOM D — sunken lever (gD) under a guard grate opens the exit gate
+    { t: 'lever', x: 125, y: 20, id: 'gD' },           // in the pocket under the lid
+    { t: 'door', x: 144, y: 8, h: 4, links: ['gD'], latch: true },   // exit gate (on the ledge)
+    { t: 'exit', x: 146, y: 8, w: 2, h: 4 },           // climb out of the drains
   ],
 });

@@ -139,12 +139,30 @@ needs a persistent crate to be necessary — so Room B is the plain counterweigh
 lift and Room C carries the brake.) Checkpoints between rooms. Exit: stairs down.
 
 ### Ch. 4 — THE DRAINS (water; interior bg, dim)
-A: open pool, learn swimming + jumping out. B: flooded corridor with air
-pockets; route forks — the long fork has a latch lever; sequence which air
-pockets chain together within one breath. C: floating box: drag it into a
-deep pool, climb onto it to reach a high pipe (box-as-raft). D: a sunken
-latch lever beneath a guard grate: find the side tunnel. Checkpoint at every
-surface chamber. Exit: climb out of the cistern.
+Built form (session 13; first WATER chapter — teaches swimming, the jump-out
+window, and the BREATH timer/porthole/drown). Four rooms, escalating, walk-line
+row 12; 150×24, seed 104, asserted in dev/ch4.js. A: open pool — swim across,
+jump out onto the flush far bank (always surfaceable, no drowning). B: a flooded
+corridor under a 5-tile roof, swum head-underwater (breath drains), surfacing at
+four air-pocket chimneys; the exit GRATE (door, latch) up to the next ledge is
+shut, so you can't rush it — its SUNKEN lever sits on the corridor floor far back
+(pulled underwater with X), and reaching it + the exit on the chimney chain is
+the breath plan. C: a high pipe ledge unreachable from the pool (can't jump out
+that high, can't mantle from water) — push the box into the narrow pool, it
+floats as a RAFT, climb it and mantle the pipe (its +1 tile bridges). D: a deep
+cistern — the exit gate (latch) is shut; its sunken lever sits in a pocket capped
+by a guard GRATE (a lid: you can't drop straight onto it, you descend beside it
+and swim in along the floor); pull it, surface, jump out onto the flush exit
+ledge, walk through the opened gate out of the drains. Checkpoint on every dry
+surface chamber (death-reset safe).
+**Deviations from the sketch above** (recorded per the hard rule): B's literal
+two-branch "route fork" is softened to *short-blocked-vs-detour* — the grate
+gates the short way up so you must detour to the sunken lever, which is the same
+breath-planning idea with simpler, non-cheesable geometry. D's "side tunnel" is a
+*swim-in-along-the-floor* under the grate lid (a gentle finale beat), not a
+distinct branching tunnel. (Reasons: a real underwater two-way fork that's both
+solvable on one breath and non-bypassable is fiddly; the softened forms verify
+cleanly and keep the breath windows generous.)
 
 ### Ch. 5 — THE HUSKS (helm intro; interior bg)
 A: one husk behind a floor gap you can't cross; helm on your side. Connect,

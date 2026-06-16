@@ -1,6 +1,76 @@
 # HOLLOW — status
 
-_Last updated: 2026-06-14 (session 12)._
+_Last updated: 2026-06-15 (session 13)._
+
+## Session 13 — T9 (Ch.4 THE DRAINS) built: the WATER / BREATH chapter
+
+Built **Chapter 4 — THE DRAINS**, the first water chapter and the swimming /
+jump-out / **breath-timer** teaching ground (the breath engine itself shipped in
+T5; this is where it becomes a real chapter mechanic). Dim interior cistern,
+150×24, seed 104, `bg:'interior'`. Four rooms, one idea each, walk-line row 12.
+Authored the geometry with a throwaway column generator (`dev/_gen_ch4.js`,
+deleted) and validated every beat by driving the real engine in the new
+`dev/ch4.js` harness.
+
+- **ROOM A — THE POOL.** Walk off the start deck into a deep OPEN pool (surface
+  flush at row 12, always surfaceable → no drowning), swim across + down, and
+  jump out onto the flush far bank. Pure swim + jump-out teach. | checkpoint 0.
+- **ROOM B — THE FLOODED CORRIDOR (the breath puzzle).** A submerged tunnel
+  under a 5-tile roof (rows 8–12): you swim it head-underwater (breath drains),
+  surfacing at **four air-pocket chimneys** (vents to the surface). The exit
+  GRATE (door gB, col 81) up to the Room-C ledge is shut, so you can't rush it —
+  its **sunken latch lever** (gB) sits on the corridor floor far back (col 58,
+  pulled *underwater* with X). The plan: don't dash the exit; detour to the
+  sunken lever (a managed breath-leg off the chimney chain), pull it (the grate
+  latches), route back to the now-open exit shaft and rise to the ledge. |
+  checkpoint 1 (Room-C ledge, past the grate).
+- **ROOM C — THE RAFT.** A high pipe ledge (row 9) is the only way on but is 3
+  tiles above the pool surface — too high to jump out onto, and you can't mantle
+  FROM water. Push the box into the narrow pool; it floats as a **raft**; climb
+  it and mantle the pipe (the box's +1 tile is exactly the bridge). | checkpoint
+  2 (the pipe ledge).
+- **ROOM D — THE CISTERN.** Drop into a deep cistern; the exit gate (gD) is shut.
+  Its sunken lever sits in a pocket capped by a **guard grate lid** — you can't
+  drop straight onto it, you descend beside it and swim in along the floor. Pull
+  it (the exit gate latches), surface, jump out onto the flush exit ledge, walk
+  through the opened gate out of the drains (exit).
+- **Two design deviations recorded in DESIGN.md** (the sketch wanted a literal
+  two-branch fork in B and a distinct side tunnel in D): B's fork is softened to
+  *short-blocked-vs-detour-to-the-sunken-lever* (same breath-planning idea, clean
+  non-cheesable geometry); D's "side tunnel" is *swim-in-under-the-grate-lid* (a
+  gentle finale). A real underwater two-way fork that's solvable on one breath
+  AND non-bypassable is fiddly; the softened forms verify cleanly and keep the
+  execution windows generous (the breath budget is the planning, not the timing).
+- **Harness lesson (validate-by-driving again):** scripting a blind swim through
+  a roof/chimney corridor needs a *position-aware* controller — pure hold-jump
+  breaches into the open chimney air and bonks the next roof; pure glide sinks to
+  the floor and the rise-to-air is too slow → drowns. The working driver reads
+  `rows[10][col]` to know when the roof is open above (a chimney) and only then
+  rises to breathe, otherwise gliding right just under the roof. (`dev/ch4.js`
+  `spanCorridor` loop.) The breath budget itself is generous: chimneys ≤12 tiles
+  apart (~3 s legs) on a 9 s lung; the deepest leg is the lever dive, which the
+  harness drives chimney→lever→chimney without drowning.
+- **`dev/ch3.js` exit assertion updated:** Ch.3 is no longer the last chapter, so
+  its exit now advances to Ch.4 (asserts `chapterIdx===3`, was `state==='title'`).
+  Ch.4's exit is the new last-chapter→title.
+- **Verified:** `node dev/headless.js` ALL PASS, `node dev/fuzz.js` FUZZ CLEAN
+  (8 seeds), `node dev/t5.js` ALL PASS, `node dev/ch1.js` / `ch2.js` / `ch3.js`
+  ALL PASS, **`node dev/ch4.js` ALL PASS** (24 checks: level sanity; A full-
+  breath-at-surface + swim-across-and-jump-out; B breath-drains-submerged,
+  refills-at-chimney, grate-shut-blocks, X-lever-underwater-latches, lever-detour
+  fits-budget, full corridor traverse-alive; C pipe-unreachable-bare, box-floats,
+  raft+climb-reaches-pipe; D can't-drop-straight-onto-lever, lever-latches-gate,
+  gate-blocks-until-pulled, exit→title). Browser render of all four rooms
+  **clean (0 console errors)**; brightened zoom shows the pool, the roofed
+  corridor + chimneys + checkpoint lamps, the box on the C ledge + pipe, the
+  cistern grate lid, and the D exit ledge/gate reading correctly.
+- **Still needs the user (Ch.4 feel sign-off):** play THE DRAINS. Does swimming
+  feel good and is the jump-out window fair? Does the breath porthole teach
+  "find air" without text, and are the air-pocket chimneys legible as breathing
+  spots? Is Room B's "the grate's shut — go find the sunken lever, mind your
+  breath" a real *plan* beat (and is the underwater lever findable — its only
+  cue is the faint X hint)? Does the box-raft click? Is Room D a calm release
+  after B/C? Machine-verified ≠ feel-verified.
 
 ## Session 12 — Ch.3 lift-half rework SHIPPED (Room C = THE CRANE / brake)
 
