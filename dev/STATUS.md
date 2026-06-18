@@ -1,6 +1,30 @@
 # HOLLOW — status
 
-_Last updated: 2026-06-16 (session 14)._
+_Last updated: 2026-06-17 (session 15)._
+
+## Session 15 — bugfix: multi-husk groups could merge into one body (softlock)
+
+User found a real dead-end in Ch.5: drive a two-husk group into a wall and both
+husks converge onto the **same x** (identical mirrored input + a shared wall =
+the offset collapses). After that every input moves them as one — you can never
+get one onto each of two plates, and the only escape is a checkpoint restart.
+
+- **Fix — husks are now solid to each OTHER** (not to the player). `collectSolids`
+  (entities.js) adds the peer husks to a husk's own solids list when `self.isHusk`,
+  so the existing swept collision stops a trailing husk one body-width (**18px**)
+  behind the one ahead. They can never overlap → the offset is always recoverable.
+  Player↔husk stays pass-through on purpose (a roaming husk must not be able to
+  shove the slumped body off its helm). ~3 lines, reuses the existing sweep.
+- **Why this over a recovery affordance:** it makes the merge physically
+  impossible instead of just softening the reset, and it's the INSIDE-faithful
+  reading (the bodies are physical). Considered+rejected: re-press-helm to re-rack
+  the husks (band-aid — merging still happens and feels bad).
+- **Verified:** full suite stayed green — `headless`/`t5`/`ch1`–`ch5` ALL PASS,
+  `fuzz` CLEAN (8 seeds). **Room C's timed-jump window survived unchanged** (the
+  one tuned beat I was worried about). A focused throwaway drove both room-B husks
+  into the stopper wall and confirmed they settle at exactly 18px apart (was: 0).
+- Docs updated: DESIGN.md (husk mechanic + Ch.5 deathless note), ARCHITECTURE.md
+  (`collectSolids` + the husk-solidity rule). No new known issues.
 
 ## Session 14 — Ch.4 feel signed off; T10 (Ch.5 THE HUSKS) built: the HELM chapter
 

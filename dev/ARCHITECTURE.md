@@ -138,7 +138,10 @@ game.js `updatePlay` calls `setWaterLevel` each frame via `waterProximity(level,
   timer, each creature's own `rng` stream) is **deterministic** — same chapter
   boots identically and dev harnesses are reproducible. (Was `Math.random()`.)
 - `collectSolids(world, self)` → rects blocking a humanoid/box (boxes, closed
-  doors, lift platforms). `liftRects(L)` → `{a,b}` platform rects.
+  doors, lift platforms). `liftRects(L)` → `{a,b}` platform rects. **When `self`
+  is a husk it also includes the OTHER husks** (not the player), so same-group
+  husks driven by one helm can't collapse onto a single x against a wall and
+  become inseparable — they stack one body-width (18px) apart instead.
 - Per-frame (call in this order from game.js):
   `updateBoxes(world, level, dt)` (buoyancy + friction included);
   `updatePlates(world, dt, heavies)` where heavies = [player, ...husks,
@@ -237,8 +240,10 @@ breath, paused, pauseSel, titleSel}`. Consts: `BREATH_MAX=9`, `BREATH_WARN=4`.
 
 - Death = reset entire chapter (respawn world from defs) but spawn at the
   saved checkpoint's coords. Checkpoint placement rules in DESIGN.md.
-- Husks: `h.isHusk = true`; they ignore searchlights; player and husks do
-  NOT collide with each other (don't add them to each other's solids).
+- Husks: `h.isHusk = true`; they ignore searchlights. Husks ARE solid to each
+  OTHER (`collectSolids` adds peer husks when `self` is a husk) so a multi-husk
+  group can't merge into one body; the player and husks do NOT collide (a
+  roaming husk must not be able to shove the slumped body off its helm).
 - While connected to a helm: route Input ctl to the helm's husks (see groups
   below), give player all-false ctl (a `down` slump), camera follows the
   controlled-husk centroid. `controlledHusks()` (game.js) returns them: a helm

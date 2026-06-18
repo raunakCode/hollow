@@ -111,6 +111,15 @@ function collectSolids(world, self) {
     const r = liftRects(L);
     out.push({ ...r.a, ref: L }, { ...r.b, ref: L });
   }
+  // husks are physical bodies to each OTHER (but not to the player). Without
+  // this, two husks driven by the same helm input collapse onto one x against
+  // a wall and can never be re-separated — stranding the puzzle and forcing a
+  // checkpoint restart. The swept collision then keeps a trailing husk one
+  // body-width behind the one ahead. Player<->husk stays pass-through so a roaming
+  // husk can't shove the slumped body off its helm.
+  if (self && self.isHusk)
+    for (const h of world.husks)
+      if (h !== self) out.push({ x: h.x, y: h.y, w: h.w, h: h.h, ref: h });
   return out;
 }
 

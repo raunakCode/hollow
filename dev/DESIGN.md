@@ -55,9 +55,12 @@ its built form). Disconnect and the husks freeze in place (a husk left on a
 plate keeps pressing it). Puzzles come from desync: walls/steps that stop one
 husk while another keeps walking; gaps that one husk falls into and another
 jumps; the same jump that climbs one husk leaves another on the floor. Husks use
-full player physics (jump, mantle, swim, push boxes). Never let a husk get
-unrecoverable — pits they fall into need a mantle/ramp back out, or the puzzle
-must still be solvable.
+full player physics (jump, mantle, swim, push boxes). Husks are **solid to each
+other** (but not to the player): without that, two husks driven by the same input
+collapse onto one x against a wall and can never be re-separated, which softlocks
+any two-plate desync (forced checkpoint). They now stack one body-width apart, so
+the offset is always recoverable. Never let a husk get unrecoverable — pits they
+fall into need a mantle/ramp back out, or the puzzle must still be solvable.
 
 **Counterweight lifts**: two platforms on a rope. Heavier side sinks at
 ~58 px/s per unit of weight difference; equal weight = holds position
@@ -176,7 +179,8 @@ one-way walkway (rows 12-13); each room's HUSKS are sealed in a pit below it
 (open rows 14-19, floor row 20), seen through a '-' window but unreachable, so a
 husk pressing a plate down in the pit is the only way to open the player's gate
 above (a latched door on the walkway). Three escalating rooms, deathless (R
-re-racks a wedged husk):
+re-racks a wedged husk; husks being solid to each other means the two-husk
+groups can no longer merge into one body against a wall):
 A — one husk: connect at the helm, drive it onto its plate, the gate latches.
 B — two husks, two plates, gate needs BOTH at once (`all`). One plate is on a
 2-tile step (a husk can only reach it by jumping), the other on the floor. Both
