@@ -252,13 +252,16 @@ check('the lead husk reached plate pC and latched gate C open', gateC().open && 
 check('the other two husks did NOT cross (fell into the gap, safe)',
   hc.filter(h => col(h) <= 125).length === 2, `cols=${hc.map(h => col(h).toFixed(1))}`);
 
-console.log('-- ROOM C: disconnect, walk the player out the exit -> last chapter -> title');
+console.log('-- ROOM C: disconnect, walk the player out the exit -> advances to Ch.6 THE MACHINES');
 tap('KeyX', 2); frames(2);                              // disconnect
 place(154, 12);                                         // on the walkway before gate C
 keyDown('ArrowRight');
-for (let i = 0; i < 360 && Game.state === 'play'; i++) frames(1);
+for (let i = 0; i < 360 && Game.chapterIdx === 4; i++) frames(1);
 releaseAll();
-check('exit finished the game (last chapter -> title)', Game.state === 'title', `state=${Game.state} px=${col(P()).toFixed(1)}`);
+// Ch.5 is no longer the last chapter — its exit now loads Ch.6 (chapterIdx 5),
+// not the title (same edit ch1-ch4 each got when the next chapter landed).
+check('exit advanced to Ch.6 (chapterIdx 5, still in play)', Game.chapterIdx === 5 && Game.state === 'play',
+  `chapter=${Game.chapterIdx} state=${Game.state} px=${col(P()).toFixed(1)}`);
 
 console.log(failures === 0 ? '\nALL PASS' : `\n${failures} FAILURE(S)`);
 process.exit(failures === 0 ? 0 : 1);

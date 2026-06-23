@@ -1,6 +1,105 @@
 # HOLLOW — status
 
-_Last updated: 2026-06-17 (session 15)._
+_Last updated: 2026-06-21 (session 17)._
+
+## Session 17 — T11 done: Ch.6 THE MACHINES built (the husks×lights×lifts×timed-plates synthesis)
+
+Executed the session-16 plan (`dev/CH6_PLAN.md`) start to finish. Built **Chapter 6
+— THE MACHINES** as `LEVELS[5]` in `js/levels2.js` (was the stub). **No new engine
+feature** — the whole chapter is a recombination of shipped mechanics, resting on
+the **husk/light asymmetry** (lights only test the player; husks aren't occluders,
+so a husk walks a player-lethal beam unharmed). 210×24, seed 106, interior, **no
+hints** (the player is experienced). Authored geometry with a throwaway column
+generator (deleted) and validated every beat by driving the engine in the new
+`dev/ch6.js` (35 checks). Three escalating rooms, checkpoints between (each past a
+latched gate, death-reset safe):
+
+- **ROOM A — THE BEAM CORRIDOR.** Player on the row-12 walkway; the lone husk is
+  sealed in the lane below, seen through `-` windows. A searchlight sweeps the lane
+  (lethal to a player, immune for the husk). Drive the husk through the beam onto
+  plate **pA**, which latches the walkway gate **d_a1**. Teaches husk-immunity by
+  contrast. | checkpoint 0.
+- **ROOM B — THE RELAY.** A timed plate **pB1 (`hold:4`)** opens BOTH a gate in the
+  husk's own lane (**d_b1**) and the player's walkway gate (**d_bw1**). Park the husk
+  on pB1, drop the player 4 tiles off the tier-1 edge to tier 2 (the col-82 face is
+  >3.2 tiles → un-mantleable, so you can't go back — the second helm is forced), then
+  at **helm B2** re-drive the SAME husk off pB1: it must beat d_b1 closing behind it
+  (the hold window) and run to **pB2**, which latches the exit gate **d_b2**. |
+  checkpoint 1.
+- **ROOM C — THE COUNTERWEIGHT (finale).** Drive the husk onto lift platform A (it
+  sinks into a pit); platform B rises 2 tiles to row 18 and **HOLDS** (the parked
+  husk counterweights it). The exit plateau (row 16) is a 4-tile mantle from the
+  ground (impossible) but only 2 from raised B. A ground searchlight guards the
+  approach with a real off-window (~2.8–4.4 s measured) — time a dash, board raised
+  B, mantle the plateau, exit → **title** (Ch.6 is the last built chapter). |
+  checkpoint 2 at the Room-C entrance (past latched d_b2, so beam deaths don't replay
+  Room B).
+
+- **Two geometry fixes the harness forced (validate-by-driving paid off again):**
+  1. **`d_b1` made a short, husk-height gate (rows 17-19) instead of full-height.**
+     With a full-height door, the door's ~0.9 s close animation let the husk squeak
+     through even at `hold:0` — so the hold wasn't actually necessary (the whole point
+     of Room B). A short gate at the husk's body height slams to blocking in ~0.4 s, so
+     `hold:0` now genuinely traps the husk and `hold:4` is what lets it beat the door.
+  2. **Platform B given its OWN pit (cols 153-155).** Originally B rested flush on
+     solid ground; the player's weight could sink B *into solid tiles* → the body got
+     ejected/teleported (a death-like glitch the harness caught). Putting B over a pit
+     (Ch.3 Room B's proven pattern) means a sinking B drops into open space and is
+     recoverable.
+- **Plan summary typo corrected:** the plan's prose said "3 helms / 4 plates"; the
+  real entity set is **4 helms / 3 plates** (Room B's relay uses two helms B1+B2 both
+  group `b`; Room C uses a lift, not a plate). The plan's own entity draft was right.
+- **Bookkeeping done:** updated `dev/ch5.js`'s exit assertion (Ch.5 now advances to
+  Ch.6 `chapterIdx===5`, not title); Ch.6's exit is the new last→title (automatic via
+  `chapterIdx+1 < LEVELS.length` in game.js — no game.js edit needed). Folded the 3
+  deviations into `dev/DESIGN.md` Ch.6 (now "Built form").
+- **Verified:** `node dev/headless.js` ALL PASS, `dev/fuzz.js` FUZZ CLEAN (8 seeds),
+  `dev/t5.js` ALL PASS, `dev/ch1.js`…`ch6.js` ALL PASS. **`dev/ch6.js` ALL PASS**
+  (35 checks: sanity + helm-group isolation; A husk-through-beam latches d_a1 + husk
+  never dies + no walkway leak + lethal-in-lane; B park-husk-on-pB1 opens both gates +
+  un-mantleable drop + B2 relay latches d_b2 + hold-necessity; C husk-raises-B-and-
+  holds + plateau-unreachable-from-ground + reachable-from-raised-B → exit→title +
+  real beam off-window + B/plateau beam-safe). Browser render of all rooms **clean
+  (0 console errors, 122 fps)** — brightened captures show the walkway/lit lane, the
+  connected camera drop, tier-2 windows, and the Room-C lift/pits/beam/plateau all
+  reading correctly.
+- **Still needs the user (Ch.6 feel sign-off):** play THE MACHINES. Does "the husk
+  walks the searchlight unharmed; you don't" click by contrast (Room A)? Is Room B's
+  two-stage relay — park the husk, drop yourself past the un-returnable edge, re-drive
+  it from a second helm to beat the lane gate — legible and fair (is the hold window
+  generous enough)? Does Room C's husk-as-counterweight + timed beam-dash land as a
+  finale, and is the dash window comfortable? Machine-verified ≠ feel-verified.
+
+## Session 16 — Ch.6 (T11) fully DESIGNED, not yet built (ran low on budget)
+
+Started T11 (Ch.6 THE MACHINES — the husks×lights×lifts×timed-plates synthesis).
+Confirmed every mechanic already exists (re-read entities.js/game.js/player.js)
+so **no new engine feature is needed**, then designed the whole chapter concretely
+and wrote the build plan to **`dev/CH6_PLAN.md`** — read it first next session and
+just execute it. Did NOT touch `js/levels2.js` (still the stub) so nothing is
+half-built/broken. **Resume = build per the plan: write `dev/_gen_ch6.js`, paste
+rows+entities into levels2.js as `LEVELS[5]`, write `dev/ch6.js`, iterate to green
+(incl. light tuning), then the bookkeeping below.**
+
+- **Design (full detail + exact coords in CH6_PLAN.md):** 210×24, seed 106,
+  interior, no hints. Room A THE BEAM CORRIDOR (drive a husk through a lethal-to-
+  player beam — husks are immune — onto a plate that latches your walkway gate;
+  Ch.5 sealed-lane idiom). Room B THE RELAY (timed plate `hold:4` as a husk
+  self-gated run + a two-helm relay forced by a 4-tile one-way drop). Room C THE
+  COUNTERWEIGHT (husk as a remote counterweight raising a lift to bridge a 4-tile
+  exit — Ch.3-B with a husk — plus a ground beam-dash the player times).
+- **Key engine facts that shaped it** (all in the plan): lights ignore husks and
+  husks aren't light occluders; **one-way `-` tiles do NOT block light rays** (so a
+  lane beam can leak up to the walkway — must verify detect==0); you can't drive a
+  husk while riding a lift; a balanced lift HOLDS; mantle cap 102px (~3.2 tiles);
+  plate `hold` keeps the signal N s after step-off.
+- **MUST-DO bookkeeping next session** (in the plan): update `dev/ch5.js`'s final
+  assertion — Ch.5 exit now advances to Ch.6 (`chapterIdx===5`), not `title`
+  (same edit ch1–ch4 got when the next chapter landed); Ch.6 exit is the new
+  last→title. Then full suite + browser render, fold 3 deviations into DESIGN.md,
+  check off T11.
+- **Nothing verified yet** — design only. No code changed; suite is still green
+  from session 15.
 
 ## Session 15 — bugfix: multi-husk groups could merge into one body (softlock)
 

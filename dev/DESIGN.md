@@ -204,13 +204,48 @@ jump); the others fall in safely rather than "bonk a wall" — same idea (only t
 right husk crosses, others are recoverable), simpler non-cheesable geometry.
 
 ### Ch. 6 — THE MACHINES (husks + lights + lifts + timed plates)
-A: corridor swept by lights you cannot pass — but husks can. Helm overlooks
-it: walk a husk through the beams onto a plate that opens your parallel
-shielded corridor. B: timed plate (`hold: 4`): too far to sprint yourself —
-park a husk on it instead, walk through, then notice the *next* door needs
-that same husk: re-connect through a second helm. C: husk as counterweight:
-you ride lift platform A; remotely walk a husk onto platform B to lower
-yourself past a beam gap. Finale combines B+C. Checkpoints between rooms.
+Built form (session 17; the synthesis chapter — every mechanic already shipped,
+no new engine feature). 210×24, seed 106, interior, no hints (the player is
+experienced). Asserted in dev/ch6.js (planned in dev/CH6_PLAN.md). Rests on the
+husk/light asymmetry: a husk walks a player-lethal searchlight unharmed (lights
+only test the player and husks aren't occluders); the player dies in it. Three
+escalating rooms, checkpoints between (each past a latched gate, death-reset safe):
+A — THE BEAM CORRIDOR. The player is on the row-12 walkway; the lone husk is
+sealed in the lane below (rows 13-19, floor 20), seen through '-' windows. A
+searchlight sweeps the lane (lethal to a player, immune for the husk). Drive the
+husk through the beam onto plate pA, which latches the player's walkway gate d_a1.
+B — THE RELAY. A timed plate pB1 (`hold: 4`) opens BOTH a gate in the husk's own
+lane (d_b1) and the player's walkway gate (d_bw1). Park the husk on pB1, drop the
+player 4 tiles off the tier-1 edge to tier 2 (the col-82 face is >3.2 tiles, so
+un-mantleable — you can't return, the second helm is forced), then at helm B2 (on
+tier 2) re-drive the SAME husk off pB1: it must beat d_b1 closing behind it (the
+hold window) and run to pB2, which latches the exit gate d_b2. C — THE
+COUNTERWEIGHT (finale). Drive the husk onto lift platform A (it sinks into a pit);
+platform B rises 2 tiles to row 18 and HOLDS (the parked husk counterweights it).
+The exit plateau (row 16) is a 4-tile mantle from the ground (impossible) but only
+2 from raised B. A ground searchlight (lethal to the player, immune for the husk)
+guards the approach with a real off-window — time a dash, board raised B, mantle
+the plateau, exit (last built chapter → title).
+**Deviations from the sketch above** (recorded per the hard rule): (1) Room A
+realises "a corridor swept by lights you cannot pass — but husks can" as Ch.5's
+sealed-lane idiom: the lit husk-lane the player overlooks. Husk-immunity is taught
+by contrast (you watch the husk stroll the lit lane); the player is never
+personally in that beam. (2) Room B makes the timed plate's `hold` the crux of a
+husk SELF-GATED run — pB1 opens a gate in the husk's own path (d_b1), so the husk
+must leave its own plate and beat the door (hold>0 is what gives it the window).
+d_b1 is a short, husk-height gate (rows 17-19) rather than full-height so it slams
+fast enough that hold:0 genuinely traps the husk (a full-height door's ~0.9 s close
+let it squeak through). The two-helm relay is forced by a 4-tile one-way DROP
+between B1 and B2 — helm control isn't range-limited, so the second helm is a
+*player-spatial* requirement, not a range one. (3) Room C inverts "ride A, lower
+yourself past a beam gap": you cannot drive a husk and ride a lift at once
+(driving = slumped at a helm), so the husk is the remote COUNTERWEIGHT that RAISES
+platform B to bridge the exit (Ch.3 Room B with a husk instead of a box; B sits
+over its own pit so a sinking B drops into open space, never solid tiles), and the
+player's beam-dash is a SEPARATE ground hazard. The timed plate is showcased
+standalone in Room B rather than literally folding B into C. (Plan §summary said
+"3 helms / 4 plates"; the real entity set is **4 helms / 3 plates** — Room B's
+relay uses two helms, Room C uses a lift not a plate.)
 
 ### Ch. 7 — THE DEEP (darkness + Listener; cavern bg)
 Darkness mask on; player glow is the only light, Listener eyes glow when
