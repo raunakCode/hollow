@@ -16,7 +16,8 @@ js/levels1.js   chapters 1–5 — defines global LEVELS = [] and pushes onto it
 dev/testmap.js  DEV-ONLY all-mechanics TEST GROUNDS sheet. Not in index.html;
                 the harnesses load it after levels2.js / before game.js, where
                 it does LEVELS.length=0 + push() to replace the chapter list.
-js/levels2.js   chapters 5–8 — stub, pushes onto LEVELS in T10–T13
+js/levels2.js   chapters 6–8 — pushes onto LEVELS (Ch.6 MACHINES, Ch.7 DEEP;
+                Ch.8 still to build in T13)
 js/game.js      state machine, camera, orchestration, main loop
 ```
 
@@ -27,10 +28,12 @@ Chromium smoke test of index.html itself (setup notes in its header);
 `dev/fuzz.js` — random-input fuzzer that flags embed/stuck states
 (player-in-tiles, player-deep-in-box, box-in-tiles). Run all three
 after engine changes. Per-chapter walkthrough harnesses load the REAL
-`LEVELS` (no testmap) and drive every beat: `dev/ch1.js` … `dev/ch5.js`
+`LEVELS` (no testmap) and drive every beat: `dev/ch1.js` … `dev/ch7.js`
 (`ch4.js` covers the water/breath chapter; `ch5.js` covers the helm chapter —
 helm-group isolation, the room-A remote plate, room-B two-husk jump desync, and
-room-C's timed runway jump over the gap).
+room-C's timed runway jump over the gap; `ch6.js` the husk×light×lift synthesis;
+`ch7.js` the Listener red-light/green-light chapter — eye cycle, still-is-safe vs
+move-is-lethal, the growl warning, per-room crossings + the scripted door finale).
 
 No modules, no fetch — everything is global-scope script, must run from
 `file://`. Canvas is 960×540 (`VIEW_W/VIEW_H`), letterboxed via `fitCanvas`.
@@ -47,6 +50,9 @@ No modules, no fetch — everything is global-scope script, must run from
   palette: { sky0:'#0a0d12', sky1:'#1a2230', horizonGlow:'rgba(...)' },
   mood: { drone: 0.06, wind: 0.05, rain: 0.04, pitch: 55 },  // AudioSys.setMood
   rain: true, dark: false,
+  playerGlow: true,          // optional: a faint additive presence halo behind the
+                             // player + husks (lit chapters only) so dark figures
+                             // stay locatable on the near-black interior ground
   rows: ['....#...', ...],   // 24 strings, equal length; chars: # . ~ G -
   playerStart: [tx, ty],     // tile coords (feet placed on ty bottom)
   entities: [ ...defs ],     // see below
@@ -69,9 +75,20 @@ Game.js should derive `level = { w, h, rows }` from this (`w` = row length,
 {t:'lift',  ax,ay, bx,by, w:2, travel:3, off:0, lock:'id'}  // counterweight: A at ay-off, B at by+off
                                                // w sets both platform widths; or aw/bw to size each
                                                // lock: signal id (lever/plate) that FREEZES the lift (the brake) while active
-{t:'creature', x,y, range:15}                  // y = floor tile it stands on
+{t:'creature', x,y, range:15, hearsHusks:false} // y = row whose BOTTOM is the floor top
+                                               // (i.e. floorRow-1, NOT the solid floor row).
+                                               // body bottom = (y+1)*TILE; if y is a solid
+                                               // tile the body embeds in it and every charge
+                                               // self-aborts (rectHitsSolidTiles). range (tiles)
+                                               // gates the NATURAL alert→charge + growl only;
+                                               // trigger-driven lunges ignore it.
+                                               // hearsHusks: also lunges at + is killed by a
+                                               // husk that MOVES near its open eye (Ch.8 Room C
+                                               // mirrored stillness); default false = ignores husks.
 {t:'check', x,y, idx:N}                        // idx = checkpoint index, ascending
 {t:'exit',  x,y, w:2, h:4}
+{t:'core',  x,y, w:3, h:4}                     // the glowing mass (Ch.8): a trigger zone (never
+                                               // solid) — walking into it flips to the ending state
 {t:'hint',  x,y, text:'←  →', r:5}
 {t:'trigger', x,y, w:2, h:4, target:0, action:'charge'|'wake', once:true}  // scripted chase: fires when the player enters; acts on world.creatures[target]
 ```
@@ -84,7 +101,8 @@ Game.js should derive `level = { w, h, rows }` from this (`w` = row length,
 call `Input.endFrame()` at end of each frame. `fitCanvas(canvas)` once.
 Menus: `Input.menuUp/menuDown()` (Arrows/WS, move cursor), `menuConfirm()`
 (Space/Enter/Z/X/E — disjoint from nav so ArrowUp never both moves & selects),
-`escPressed()` (Escape, pause toggle).
+`escPressed()` (Escape, pause toggle). `digitPressed()` returns 1-9 pressed this
+frame (0 = none); used by the title chapter-select.
 
 ### audio.js (AudioSys)
 `init()` (must be inside a user-gesture handler; also kicks off `_loadSamples`),
@@ -133,7 +151,7 @@ game.js `updatePlay` calls `setWaterLevel` each frame via `waterProximity(level,
 
 ### entities.js
 - `spawnEntities(defs, seed) → world` with arrays: boxes, doors, levers, plates,
-  lights, husks, helms, lifts, creatures, checks, exits, hints, triggers.
+  lights, husks, helms, lifts, creatures, checks, exits, hints, triggers, cores.
   `seed` (chapter seed) feeds a `makeRng` so spawn jitter (light phase, creature
   timer, each creature's own `rng` stream) is **deterministic** — same chapter
   boots identically and dev harnesses are reproducible. (Was `Math.random()`.)
@@ -177,8 +195,9 @@ rain for parallax feel).
 Drawn (mostly pulled forward from T4 in sessions 2–3): `box`, `door`,
 `plate`, `lever`, `lightCone`, `helm`, `lift` (ropes + slabs, per-platform
 width via `liftRects`), `creature` (body + eye), `check` (lamp),
-`exitGlow`, `hint`. `humanoid` has a faint rim-light so the figure separates
-from same-value backgrounds. `hint(ctx, h, cam)` draws a faint serif key-glyph
+`exitGlow`, `core` (a warm pulsing radial bloom — the Ch.8 glowing mass, drawn
+with `lighter` compositing), `hint`. `humanoid` has a faint rim-light so the
+figure separates from same-value backgrounds. `hint(ctx, h, cam)` draws a faint serif key-glyph
 at `h.alpha` (game.js fades alpha in/out by player proximity to `h.r`).
 `lightCone(ctx, Lt, cam, level, world)` fans a ray per ~0.012 rad across the
 fov, each stopped by `_coneRayHit(level, world, …)` at the first solid tile /
@@ -189,10 +208,21 @@ a `disabled` (offWhen) fixture dims to a dead glow.
 
 ### game.js
 
-Global `Game` object: `{state ('title'|'play'|'dead'), chapterIdx, chapter
-(LEVELS def), level ({w,h,rows}), world, player, cam {x,y,dx,look}, time,
+Global `Game` object: `{state ('title'|'play'|'dead'|'ending'), chapterIdx,
+chapter (LEVELS def), level ({w,h,rows}), world, player, cam {x,y,dx,look}, time,
 fade (0 clear..1 black), fadeV, onFaded, danger, last, helmed, checkpointIdx,
-breath, paused, pauseSel, titleSel}`. Consts: `BREATH_MAX=9`, `BREATH_WARN=4`.
+breath, paused, pauseSel, titleSel, selecting, selectSel, ending}`. Consts:
+`BREATH_MAX=9`, `BREATH_WARN=4`.
+
+- **Ending cinematic** (`Game.state==='ending'`, Ch.8): `updatePlay` starts it
+  when the player touches a `core` zone (`startEnding()`). `Game.ending =
+  {phase, t, white, scroll, wall, opening, donePrompt}`; `updateEnding`/
+  `drawEnding` run instead of `updatePlay`/`drawPlay`. Phases: `walk` (the player
+  + every husk are auto-driven right; the wall — the door tagged `links:['_wall']`,
+  which no signal opens in play — animates `openT` once they reach it) → `whiteout`
+  (warm-white bloom) → `card` (the HOLLOW wordmark on a settling field) →
+  `credits` (the `CREDITS` scroll; any key skips) → `end` (press any key →
+  fade → title, save cleared). No `exit` entity is used (the Core is the terminus).
 
 - `loadChapter(i)` — sets chapter/level, `Render.buildBackground`,
   `AudioSys.setMood`, then `resetChapterState()`.
@@ -210,9 +240,14 @@ breath, paused, pauseSel, titleSel}`. Consts: `BREATH_MAX=9`, `BREATH_WARN=4`.
   crouch-in-grass → updateLights/Creatures → **breath** (drains while
   `headInWater`, drown→`die(true)` at 0; refills ×4/s at the surface,
   `gasp` SFX crossing the warn line; low breath feeds `Game.danger`) →
-  danger/kills → checkpoints/save → exit check → camera.
+  danger/kills → checkpoints/save → core (→ ending) / exit check → camera.
 - **Breath UX**: `drawPlay` closes the view to a shrinking porthole
   (`Render.darkness` with a hole at the player) once `breath < BREATH_WARN`.
+- **Dark chapters** (`chapter.dark`, e.g. Ch.7): `drawPlay` calls
+  `Render.darkness(0.93, holes)` where holes = the player glow (r140) PLUS one
+  hole per creature at its eye (`c.x+c.w*0.30, c.y+c.h*0.26`, radius/alpha scaled
+  by `c.eye`), so an OPEN Listener eye glows through the mask (the red-light tell);
+  a shut eye (`eye≤0.05`) punches nothing.
 - **Pause** (`Esc`, only in play, ignored mid-fade): `Game.paused` freezes
   `updatePlay`; `updatePauseMenu()` + `drawPause()` give resume / restart
   (`resetChapterState`) / mute (`AudioSys.toggleMute`), `Game.pauseSel` cursor.
@@ -221,6 +256,14 @@ breath, paused, pauseSel, titleSel}`. Consts: `BREATH_MAX=9`, `BREATH_WARN=4`.
   any key" → new game. New game clears the save and loads chapter 0; continue
   loads the saved chapter+checkpoint. Gated on `fade < 0.5` (boot keypress
   can't skip an unseen title).
+- **Dev chapter-select** (testing aid): on the title, `` ` `` (Backquote) toggles
+  `Game.selecting` — a "JUMP TO CHAPTER" overlay listing every `LEVELS` entry.
+  `updateChapterSelect()` handles up/down (`Game.selectSel`), a digit 1-9 jumps
+  straight to that chapter, confirm enters the cursor's chapter, Esc closes.
+  `jumpToChapter(i)` fades out → `loadChapter(i)` → play; it does NOT write the
+  save (any checkpoint reached afterwards saves normally). Handled before the
+  any-key "new game" path so the toggle can't double as starting the game. A
+  faint `` `  chapters`` hint sits in the title's bottom-left.
 - `updateBoxInteraction(p, world, dt)` — push: if `p.lastHitX` is a box
   and the player is grounded, dry, and pressing toward it → `box.vx =
   facing*70`, `p.pushTimer = 0.2`, throttled `boxDrag` SFX. Grab: hold

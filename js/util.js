@@ -48,6 +48,8 @@ const Input = {
   menuDown()    { return !!(this.pressed['ArrowDown'] || this.pressed['KeyS']); },
   menuConfirm() { return !!(this.pressed['Space'] || this.pressed['Enter'] || this.pressed['KeyZ'] || this.pressed['KeyX'] || this.pressed['KeyE']); },
   escPressed()  { return !!this.pressed['Escape']; },
+  // Dev: 1-9 pressed this frame (0 = none). Used by the title chapter-select.
+  digitPressed() { for (let n = 1; n <= 9; n++) if (this.pressed['Digit' + n] || this.pressed['Numpad' + n]) return n; return 0; },
 
   endFrame() { this.pressed = {}; this.anyKeyThisFrame = false; },
 };

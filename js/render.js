@@ -476,6 +476,30 @@ const Render = {
     ctx.fillRect(x, y, e.w, e.h);
   },
 
+  // The Core: a warm pulsing glowing mass (the ending trigger). A bright,
+  // breathing radial bloom with a hot center — the one warm light in the game.
+  core(ctx, c, cam, time) {
+    const cx = c.x + c.w / 2 - cam.x, cy = c.y + c.h * 0.55 - cam.y;
+    const pulse = 0.5 + 0.5 * (Math.sin(time * 1.1) + Math.sin(time * 2.7) * 0.4);
+    const R = c.w * (1.4 + 0.12 * pulse);
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const g = ctx.createRadialGradient(cx, cy, 1, cx, cy, R);
+    g.addColorStop(0, `rgba(255,240,210,${(0.55 + 0.2 * pulse).toFixed(3)})`);
+    g.addColorStop(0.25, `rgba(245,200,140,${(0.30 + 0.12 * pulse).toFixed(3)})`);
+    g.addColorStop(0.6, 'rgba(220,150,90,0.10)');
+    g.addColorStop(1, 'rgba(200,120,70,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(cx - R, cy - R, R * 2, R * 2);
+    // hot core
+    const hot = ctx.createRadialGradient(cx, cy, 1, cx, cy, c.w * 0.42);
+    hot.addColorStop(0, `rgba(255,250,235,${(0.7 + 0.25 * pulse).toFixed(3)})`);
+    hot.addColorStop(1, 'rgba(255,235,200,0)');
+    ctx.fillStyle = hot;
+    ctx.fillRect(cx - c.w * 0.5, cy - c.w * 0.5, c.w, c.w);
+    ctx.restore();
+  },
+
   // Faint serif key-glyph caption, fades in by proximity (alpha set in
   // game.js). Drawn in world space; no box, no chrome — just dim letters.
   hint(ctx, h, cam) {

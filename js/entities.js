@@ -8,7 +8,7 @@ function spawnEntities(defs, seed) {
   const w = {
     boxes: [], doors: [], levers: [], plates: [], lights: [],
     husks: [], helms: [], lifts: [], creatures: [], checks: [],
-    exits: [], hints: [], triggers: [],
+    exits: [], hints: [], triggers: [], cores: [],
   };
   // Seeded so spawn (light phase, creature timer) is deterministic — same
   // chapter always boots identically and the dev harnesses are reproducible.
@@ -72,6 +72,7 @@ function spawnEntities(defs, seed) {
           x: px, y: py - 26, w: 86, h: 58, homeX: px, vx: 0,
           state: 'dormant', timer: 1.5 + rand() * 2, eye: 0,
           range: (d.range || 15) * TILE, chargeDir: 0,
+          hearsHusks: !!d.hearsHusks,   // also charges/kills a noisy husk (Ch.8 mirrored stillness)
           rng: makeRng((rand() * 4294967296) >>> 0),   // own stream for state timers
         });
         break;
@@ -80,6 +81,12 @@ function spawnEntities(defs, seed) {
         break;
       case 'exit':
         w.exits.push({ x: px, y: py, w: (d.w || 2) * TILE, h: (d.h || 4) * TILE });
+        break;
+      case 'core':
+        // The Core: a glowing mass. Walking into it on the last chapter flips
+        // control to the ending cinematic (see game.js updateEnding). It's a
+        // trigger zone + a warm glow; never solid.
+        w.cores.push({ x: px, y: py, w: (d.w || 3) * TILE, h: (d.h || 4) * TILE });
         break;
       case 'hint':
         w.hints.push({ x: px, y: py, text: d.text, r: (d.r || 5) * TILE, alpha: 0 });
@@ -309,6 +316,15 @@ function updateCreatures(world, level, player, dt) {
       case 'alert':
         c.eye = 1;
         if (near && playerNoisy) creatureStartCharge(c, pcx);
+        // mirrored stillness (Ch.8): a Listener that hears husks also lunges at
+        // a husk that MOVES near its open eye — so a driven husk must freeze too.
+        else if (c.hearsHusks) {
+          for (const h of world.husks) {
+            const hcx = h.x + h.w / 2;
+            if (Math.abs(hcx - ccx) < c.range && Math.abs(h.y - c.y) < 200 &&
+                (Math.abs(h.vx) > 14 || Math.abs(h.vy) > 80)) { creatureStartCharge(c, hcx); break; }
+          }
+        }
         if (c.timer <= 0) { c.state = 'dormant'; c.timer = 2.2 + c.rng() * 2.2; }
         break;
       case 'charge': {
@@ -319,6 +335,8 @@ function updateCreatures(world, level, player, dt) {
           c.x -= c.vx * dt; c.vx = 0; c.timer = 0;
         }
         if (aabb(c, player)) killed = true;
+        // a charge that catches one of your husks is also fatal (it's your body)
+        if (c.hearsHusks) for (const h of world.husks) if (aabb(c, h)) killed = true;
         c.timer -= dt;
         if (c.timer <= 0 && Math.abs(c.vx) < 80) { c.state = 'return'; }
         if ((c.chargeDir > 0 && ccx > c.targetX + 90) || (c.chargeDir < 0 && ccx < c.targetX - 90)) {

@@ -17,7 +17,7 @@
 //     B rises to row 18 and HOLDS. The plateau (row 16) is unreachable from the
 //     ground (4 tiles >102px) but reachable from raised B (2 tiles). A ground
 //     searchlight (player-lethal, husk-immune) guards the approach with a real
-//     off-window. Exit -> title (Ch.6 is the last built chapter).
+//     off-window. Exit -> advances to Ch.7 (Ch.6 is no longer the last chapter).
 //   Run `node dev/ch6.js`.
 // ---------------------------------------------------------------
 'use strict';
@@ -340,7 +340,7 @@ releaseAll();
 check('from the ground the player cannot mount the plateau (never grounded above row 17)', bestRowGround > 17,
   `bestGroundedRow=${bestRowGround.toFixed(2)} col=${col(P()).toFixed(1)}`);
 
-console.log('-- ROOM C: with B raised, the plateau IS reachable (2 tiles) -> mantle + exit -> title');
+console.log('-- ROOM C: with B raised, the plateau IS reachable (2 tiles) -> mantle + exit -> Ch.7');
 startCh6();
 connectAt(136, 20);
 keyDown('ArrowRight');
@@ -356,8 +356,11 @@ for (let i = 0; i < 240 && Game.state === 'play'; i++) {
   frames(1);
 }
 releaseAll();
-check('player mantled raised B onto the plateau and reached the exit -> title', Game.state === 'title',
-  `state=${Game.state} col=${col(P()).toFixed(1)} feetRow=${row(P()).toFixed(1)}`);
+// Ch.6 is no longer the last chapter — its exit now advances to Ch.7 (THE DEEP),
+// so the game stays in 'play' on chapter 6, not back to the title.
+check('player mantled raised B onto the plateau and reached the exit -> advances to Ch.7',
+  Game.state === 'play' && Game.chapterIdx === 6,
+  `state=${Game.state} ch=${Game.chapterIdx} col=${col(P()).toFixed(1)} feetRow=${row(P()).toFixed(1)}`);
 
 console.log('-- ROOM C: the ground beam has a real off-window (dashable) and spares raised B / the plateau');
 startCh6();

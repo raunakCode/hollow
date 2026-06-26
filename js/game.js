@@ -24,6 +24,9 @@ const Game = {
   paused: false,
   pauseSel: 0,               // 0 resume | 1 restart | 2 mute
   titleSel: 0,               // 0 continue | 1 new game (when a save exists)
+  selecting: false,          // dev: chapter-select overlay open on the title
+  selectSel: 0,              // dev: highlighted chapter in the select overlay
+  ending: null,              // ending cinematic state (Ch.8 Core) when active
 };
 
 const BREATH_MAX = 9;        // seconds the player can hold their breath
@@ -240,6 +243,10 @@ function updatePlay(dt) {
   AudioSys.setWaterLevel(p.inWater ? 1 : waterProximity(level, p));
 
   if (Game.fadeV === 0) {
+    // the Core: walking into the glow flips control to the ending cinematic
+    for (const co of world.cores) {
+      if (aabb(p, co)) { startEnding(); return; }
+    }
     for (const ex of world.exits) {
       if (aabb(p, ex)) {
         fadeOutThen(1.3, () => {
@@ -382,6 +389,7 @@ function drawPlay(dt) {
   Render.fogBand(ctx, cam, Game.time, 'rgba(120,140,160,0.045)');
   Render.tiles(ctx, Game.level, cam, Game.time);
   // basic silhouettes for everything collidable/lethal (styled in T4)
+  for (const co of Game.world.cores) Render.core(ctx, co, cam, Game.time);
   for (const ex of Game.world.exits) Render.exitGlow(ctx, ex, cam, Game.time);
   for (const c of Game.world.checks) Render.check(ctx, c, cam, Game.time);
   for (const L of Game.world.lifts) Render.lift(ctx, L, cam);
@@ -393,6 +401,25 @@ function drawPlay(dt) {
   for (const cr of Game.world.creatures) Render.creature(ctx, cr, cam, Game.time);
   Render.water(ctx, Game.level, cam, Game.time);
   const drivenSet = controlledHusks();
+  // presence glow: in a lit-but-very-dark chapter (e.g. Ch.8's unlit stretches)
+  // a dark figure on the near-black ground is invisible until you reach a light.
+  // An opt-in (`playerGlow`) faint additive halo BEHIND the figures keeps you —
+  // and the husks you drive — locatable, without lifting the silhouette itself.
+  if (ch.playerGlow && !ch.dark) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const halo = (e, col, r) => {
+      const gx = e.x + e.w / 2 - cam.x, gy = e.y + e.h / 2 - cam.y;
+      const g = ctx.createRadialGradient(gx, gy, 1, gx, gy, r);
+      g.addColorStop(0, col);
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(gx - r, gy - r, r * 2, r * 2);
+    };
+    for (const h of Game.world.husks) halo(h, 'rgba(120,112,104,0.11)', 105);
+    halo(Game.player, 'rgba(158,146,132,0.16)', 125);
+    ctx.restore();
+  }
   for (const h of Game.world.husks)
     Render.humanoid(ctx, h, cam, { huskGlow: true, connected: drivenSet.includes(h) });
   Render.humanoid(ctx, Game.player, cam, {});
@@ -400,9 +427,20 @@ function drawPlay(dt) {
   for (const Lt of Game.world.lights) Render.lightCone(ctx, Lt, cam, Game.level, Game.world);
   if (ch.dark) {
     const p = Game.player;
-    Render.darkness(ctx, 0.93, [
+    // the player's glow + each Listener's OPEN eye punch holes in the dark, so
+    // an opening eye reads as a glowing pool of light (the red-light tell). The
+    // eye position mirrors Render.creature's (c.w*0.30, c.h*0.26).
+    const holes = [
       { x: p.x + p.w / 2 - cam.x, y: p.y + p.h / 2 - cam.y, r: 140, a: 0.85 },
-    ]);
+    ];
+    for (const cr of Game.world.creatures) {
+      if (cr.eye <= 0.05) continue;
+      holes.push({
+        x: cr.x + cr.w * 0.30 - cam.x, y: cr.y + cr.h * 0.26 - cam.y,
+        r: 34 + 70 * cr.eye, a: 0.5 * cr.eye,
+      });
+    }
+    Render.darkness(ctx, 0.93, holes);
   }
   if (ch.rain) Render.rainPass(ctx, dt, cam);
   else Render.motesPass(ctx, dt, Game.time);
@@ -422,6 +460,17 @@ function drawPlay(dt) {
 // The boot keypress can't skip it (gated on the fade half-clearing).
 function updateTitle() {
   if (Game.fadeV > 0 || Game.fade >= 0.5) return;
+
+  // Dev affordance: ` toggles a chapter-select overlay so any chapter can be
+  // booted directly for testing. Handled before the any-key "new game" path so
+  // toggling it can't double as starting the game.
+  if (Input.pressed['Backquote']) {
+    Game.selecting = !Game.selecting;
+    Game.selectSel = clamp(Game.selectSel, 0, LEVELS.length - 1);
+    return;
+  }
+  if (Game.selecting) { updateChapterSelect(); return; }
+
   const sv = loadSave();
   const begin = () => fadeOutThen(1.6, () => {
     const newGame = !sv || Game.titleSel === 1;
@@ -443,6 +492,29 @@ function updateTitle() {
   }
 }
 
+// Dev chapter-select overlay (open from the title with `). Up/down move the
+// cursor, a digit jumps straight to that chapter, confirm enters the cursor's
+// chapter, Esc closes. Does not touch the save — a jump is a clean fresh load
+// (any checkpoint reached afterwards saves as usual).
+function updateChapterSelect() {
+  if (Input.escPressed()) { Game.selecting = false; return; }
+  const n = LEVELS.length;
+  if (Input.menuUp())   Game.selectSel = (Game.selectSel + n - 1) % n;
+  if (Input.menuDown()) Game.selectSel = (Game.selectSel + 1) % n;
+  const d = Input.digitPressed();
+  if (d >= 1 && d <= n) { Game.selectSel = d - 1; jumpToChapter(d - 1); return; }
+  if (Input.menuConfirm()) jumpToChapter(Game.selectSel);
+}
+
+function jumpToChapter(i) {
+  Game.selecting = false;
+  fadeOutThen(1.6, () => {
+    loadChapter(i);
+    AudioSys.setMood(Game.chapter.mood);
+    Game.state = 'play';
+  });
+}
+
 function drawTitle() {
   const ctx = Game.ctx;
   ctx.fillStyle = '#04060a';
@@ -455,6 +527,13 @@ function drawTitle() {
   const x0 = VIEW_W / 2 - ((word.length - 1) * stepX) / 2;
   ctx.fillStyle = 'rgba(185,198,214,0.82)';
   for (let i = 0; i < word.length; i++) ctx.fillText(word[i], x0 + i * stepX, VIEW_H * 0.42);
+  if (Game.selecting) {
+    drawChapterSelect(ctx);
+    ctx.restore();
+    Render.vignette(ctx);
+    Render.grainPass(ctx);
+    return;
+  }
   if (loadSave()) {
     const items = ['continue', 'new game'];
     ctx.font = '18px Georgia, serif';
@@ -471,9 +550,31 @@ function drawTitle() {
     ctx.fillStyle = 'rgba(150,165,185,' + pulse.toFixed(3) + ')';
     ctx.fillText('press any key', VIEW_W / 2, VIEW_H * 0.62);
   }
+  // Faint dev hint: ` opens the chapter-select.
+  ctx.textAlign = 'left';
+  ctx.font = '12px Georgia, serif';
+  ctx.fillStyle = 'rgba(110,124,144,0.32)';
+  ctx.fillText('`  chapters', 14, VIEW_H - 16);
   ctx.restore();
   Render.vignette(ctx);
   Render.grainPass(ctx);
+}
+
+function drawChapterSelect(ctx) {
+  ctx.textAlign = 'center';
+  ctx.font = '13px Georgia, serif';
+  ctx.fillStyle = 'rgba(120,135,155,0.5)';
+  ctx.fillText('JUMP TO CHAPTER', VIEW_W / 2, VIEW_H * 0.505);
+  ctx.font = '16px Georgia, serif';
+  const top = VIEW_H * 0.56, step = 22;
+  for (let i = 0; i < LEVELS.length; i++) {
+    const on = Game.selectSel === i;
+    ctx.fillStyle = on
+      ? 'rgba(205,216,230,' + (0.7 + 0.15 * (Math.sin(Game.time * 3) + 1) / 2).toFixed(3) + ')'
+      : 'rgba(120,135,155,0.4)';
+    const label = (i + 1) + '.  ' + (LEVELS[i].name || ('chapter ' + (i + 1)));
+    ctx.fillText((on ? '› ' : '  ') + label, VIEW_W / 2, top + i * step);
+  }
 }
 
 // Esc pause: resume / restart-at-checkpoint / mute. Play is frozen while open.
@@ -507,6 +608,169 @@ function drawPause() {
   ctx.restore();
 }
 
+// --------------------------- ending cinematic ------------------------
+// Walking into the Core (Ch.8) flips control: the player and every husk in the
+// chamber walk in unison toward the far wall and push it open together, then a
+// warm whiteout, the title card, the credits scroll, and back to the title.
+
+const CREDITS = [
+  'HOLLOW',
+  '',
+  '',
+  'a small game in the shape',
+  'of a larger silence',
+  '',
+  '',
+  'THE FOREST',
+  'THE FENCE',
+  'THE YARD',
+  'THE DRAINS',
+  'THE HUSKS',
+  'THE MACHINES',
+  'THE DEEP',
+  'THE CORE',
+  '',
+  '',
+  'built procedurally —',
+  'every line of it drawn, not loaded',
+  '',
+  '',
+  'with thanks to INSIDE,',
+  'for showing the way down',
+  '',
+  '',
+  '',
+  'thank you for walking',
+  '',
+];
+
+function startEnding() {
+  Game.state = 'ending';
+  Game.helmed = null;
+  Game.danger = 0;
+  Game.paused = false;
+  // the wall they push open: the door tagged with the '_wall' link (which no
+  // signal ever satisfies, so it stays a solid wall during play)
+  const wall = Game.world.doors.find(d => d.links && d.links.includes('_wall'));
+  Game.ending = { phase: 'walk', t: 0, white: 0, scroll: 0, wall, opening: false, donePrompt: 0 };
+  AudioSys.disconnect();
+}
+
+const ENDING_WALK = { left: false, right: true, up: false, down: false, jump: false, jumpHeld: false };
+
+function updateEnding(dt) {
+  const e = Game.ending, p = Game.player, world = Game.world, level = Game.level;
+  e.t += dt;
+
+  if (e.phase === 'walk' || e.phase === 'whiteout') {
+    // unison walk: the player and EVERY husk stride right together
+    updateHumanoid(p, ENDING_WALK, dt, level, collectSolids(world, p), false);
+    for (const h of world.husks)
+      updateHumanoid(h, ENDING_WALK, dt, level, collectSolids(world, h), false);
+    // the wall: starts opening once the crowd reaches it, then they pour through
+    if (e.wall) {
+      const reach = p.x + p.w > e.wall.x - TILE * 1.4;
+      if (reach && !e.opening) { e.opening = true; AudioSys.doorMove(); }
+      if (e.opening) e.wall.openT = clamp(e.wall.openT + dt * 0.5, 0, 1);
+    }
+    updateCamera(dt, false);
+  }
+
+  switch (e.phase) {
+    case 'walk':
+      // once they've walked THROUGH the opened wall, begin the warm whiteout
+      if (e.wall && e.wall.openT > 0.85 && p.x > e.wall.x + TILE) { e.phase = 'whiteout'; e.t = 0; }
+      break;
+    case 'whiteout':
+      e.white = clamp(e.white + dt * 0.45, 0, 1);
+      if (e.white >= 1 && e.t > 2.2) { e.phase = 'card'; e.t = 0; }
+      break;
+    case 'card':
+      // hold the wordmark on white, then settle the field toward black
+      if (e.t > 5.0) { e.phase = 'credits'; e.t = 0; e.scroll = 0; }
+      break;
+    case 'credits':
+      e.scroll += dt * 34;   // px/s
+      // skip to the end prompt on a key
+      if (Input.anyKeyThisFrame) { e.phase = 'end'; e.t = 0; }
+      else if (e.scroll > CREDITS.length * 40 + VIEW_H * 0.5) { e.phase = 'end'; e.t = 0; }
+      break;
+    case 'end':
+      e.donePrompt = clamp(e.donePrompt + dt, 0, 1);
+      // a key after the prompt has shown returns to the title (fresh save)
+      if (e.t > 0.6 && Input.anyKeyThisFrame && Game.fadeV === 0) {
+        fadeOutThen(1.4, () => {
+          try { localStorage.removeItem(SAVE_KEY); } catch (err) { /* ok */ }
+          Game.ending = null;
+          loadChapter(0);
+          Game.state = 'title';
+        });
+      }
+      break;
+  }
+}
+
+function drawEnding(dt) {
+  const ctx = Game.ctx, e = Game.ending;
+  if (e.phase === 'walk' || e.phase === 'whiteout') {
+    drawPlay(dt);
+    if (e.white > 0) {
+      // warm whiteout blooming from the open wall
+      ctx.fillStyle = `rgba(255,248,236,${e.white.toFixed(3)})`;
+      ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    }
+    return;
+  }
+  // card / credits / end: a calm field with serif text
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  if (e.phase === 'card') {
+    // white settling toward a deep calm blue-black
+    const k = clamp(e.t / 5.0, 0, 1);
+    const v = Math.round(lerp(248, 6, k));
+    ctx.fillStyle = `rgb(${v},${Math.round(lerp(244, 8, k))},${Math.round(lerp(232, 12, k))})`;
+    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    const tcol = k < 0.5 ? 90 : 200;
+    ctx.font = '60px Georgia, "Times New Roman", serif';
+    const word = 'HOLLOW', stepX = 76, x0 = VIEW_W / 2 - ((word.length - 1) * stepX) / 2;
+    const a = clamp(Math.min(e.t / 1.0, (5.0 - e.t) / 1.0), 0, 1);
+    ctx.fillStyle = `rgba(${tcol},${tcol + 8},${tcol + 20},${(0.9 * a).toFixed(3)})`;
+    for (let i = 0; i < word.length; i++) ctx.fillText(word[i], x0 + i * stepX, VIEW_H * 0.44);
+  } else {
+    ctx.fillStyle = '#06080c';
+    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    if (e.phase === 'credits') drawCredits(ctx, e);
+    else {
+      ctx.font = '60px Georgia, serif';
+      ctx.fillStyle = 'rgba(200,210,226,0.85)';
+      for (let i = 0; i < 6; i++) ctx.fillText('HOLLOW'[i], VIEW_W / 2 - 190 + i * 76, VIEW_H * 0.40);
+      const pulse = 0.18 + 0.12 * (Math.sin(Game.time * 1.7) + 1) / 2;
+      ctx.font = '16px Georgia, serif';
+      ctx.fillStyle = `rgba(150,165,185,${(pulse * e.donePrompt).toFixed(3)})`;
+      ctx.fillText('press any key', VIEW_W / 2, VIEW_H * 0.62);
+    }
+  }
+  ctx.restore();
+  Render.vignette(ctx);
+  Render.grainPass(ctx);
+}
+
+function drawCredits(ctx, e) {
+  const baseY = VIEW_H + 20 - e.scroll;
+  for (let i = 0; i < CREDITS.length; i++) {
+    const y = baseY + i * 40;
+    if (y < -20 || y > VIEW_H + 20) continue;
+    const line = CREDITS[i];
+    const head = line === line.toUpperCase() && line.length > 2;
+    ctx.font = (head ? '20px' : '16px') + ' Georgia, serif';
+    // fade near the top/bottom edges
+    const edge = clamp(Math.min(y, VIEW_H - y) / 80, 0, 1);
+    ctx.fillStyle = `rgba(190,202,220,${(0.7 * edge).toFixed(3)})`;
+    ctx.fillText(line, VIEW_W / 2, y);
+  }
+}
+
 // ---------------------------- main loop ------------------------------
 
 function frame(ts) {
@@ -518,6 +782,9 @@ function frame(ts) {
   if (Game.state === 'title') {
     updateTitle();
     drawTitle();
+  } else if (Game.state === 'ending') {
+    updateEnding(dt);
+    drawEnding(dt);
   } else {
     if (Game.state === 'play') {
       if (Input.escPressed() && Game.fadeV === 0) Game.paused = !Game.paused;

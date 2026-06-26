@@ -248,24 +248,89 @@ standalone in Room B rather than literally folding B into C. (Plan §summary sai
 relay uses two helms, Room C uses a lift not a plate.)
 
 ### Ch. 7 — THE DEEP (darkness + Listener; cavern bg)
-Darkness mask on; player glow is the only light, Listener eyes glow when
-open. A: single Listener beside the path — learn the growl tell. B: tunnel
-with two Listeners on overlapping cycles; grass patches mark safe waiting
-spots (flavor only — stillness is what saves you). C: pool crossing with a
-Listener on the far shore: float motionless when the eye opens (vertical
-drift is allowed, strokes are not). D: scripted finale: a long charge — sprint
-right and slide under a closing door. Use a `trigger` zone (action `'charge'`)
-to fire the scripted lunge as the player crosses the threshold (implemented T5).
-Generous checkpoints (every segment).
+Built form (session 18; first Listener chapter — the whole thing is red-light /
+green-light: a Listener cycles dormant → waking (0.8 s growl warning) → alert
+(eye GLOWS); while the eye is open, moving near it triggers a lethal charge,
+standing still is always safe). 226×24, seed 107, cavern, `dark: true`, no hints.
+Asserted in dev/ch7.js. The darkness mask is the only light: the player's glow +
+each Listener's OPEN eye punch holes in the mask (engine: game.js `drawPlay` adds
+an eye-glow hole per creature scaled by `c.eye`), so an opening eye reads as a
+glowing pool — the red-light tell. Four rooms, generous checkpoints (5 total —
+every segment, all death-reset safe since nothing behind the player needs redoing):
+A — THE FIRST EYE: one Listener astride the flat path; learn the growl/eye tell
+(its body isn't solid, so you walk past it; only the charge kills). B — THE TWO:
+two Listeners 12 tiles apart with overlapping danger zones on INDEPENDENT (per-
+creature seeded) cycles, so the "both eyes shut" windows are short/irregular —
+stop-and-go, freezing when EITHER opens; grass tufts mark rest spots (flavor).
+C — THE FLOODED HOLLOW: a short submerged crossing (water over the floor) past a
+submerged Listener — you bottom-walk it, freezing by standing still on the floor;
+breath stays generous (cross a green window from the dry edge). D — THE COLLAPSE
+(finale): entering WAKES the chaser (growl + glowing eye behind you, no lunge);
+stepping plate pD opens the exit door dD (which then DESCENDS as the plate-hold
+expires) AND lunges the chaser at the plate — slide under dD before it seals;
+dawdling on pD is swept. Exit → title (last built chapter).
+**Deviations from the sketch above** (recorded per the hard rule): (1) "float
+motionless" in Room C isn't physically possible — an idle submerged player SINKS
+at ~170 px/s (over the `|vy|>80` noise threshold), so the safe freeze is standing
+still on the pool FLOOR (grounded, `vy≈0`); the creature must also be at floor
+level for its horizontal charge to overlap the player, which is why Room C is a
+bottom-walk rather than a surface swim. (2) The "closing door" is the engine's
+top-anchored door CLOSING (the slab grows downward as the plate-hold expires) — a
+descending shutter you slide under, exactly the INSIDE beat. The finale chase is a
+scripted lunge at the commit point (the chaser is given a tiny natural `range` so
+only the `trigger` zones drive it — a `'wake'` tell on entry, a `'charge'` lunge
+on the plate); a true continuous pursuit is unwinnable (charge speed 560 > run
+215), so the threat is "don't hesitate on the plate," not "outrun it forever."
+**Engine-placement gotcha (recorded):** a creature's body bottom sits at
+`(def.y+1)*TILE`, so its `y` must be the row whose bottom is the floor top (one
+row ABOVE the floor row); placed ON a solid floor row its rect overlaps that
+tile and `rectHitsSolidTiles` self-aborts every charge. (Floor row 18 → creature
+`y:17`; cf. testmap floor row 16 → creature `y:15`.)
 
-### Ch. 8 — THE CORE (everything; interior bg, strange warm glow)
-Three escalating rooms: (1) lights + box logistics, (2) husk desync + lift +
-timed plate "orchestra" room, (3) darkness + one Listener + a husk you must
-walk *while you both stand still during eye-open* (mirrored stillness).
-Then the Core chamber: walking into the glow flips control — the ending walk:
-every husk in the room walks in unison with you toward a wall and pushes it
-open together. White fade. Title card. Credits (engine TODO: ending
-cinematic state). After credits: "press R" → title.
+### Ch. 8 — THE CORE (everything; interior bg, strange warm glow) — Built form
+A short victory-lap gauntlet (flat interior floor, rows 19-23; 170×24, seed 108,
+no hints) recombining shipped mechanics, then the Core chamber + the ending.
+- **ROOM A — THE GLARE** (lights + box): two searchlights sweep a roofed strip
+  (rows 13-15, cols 12-33 — so a beam can't be jumped over) with an always-lit
+  seam (no clean dash). Push the box as a rolling shadow-shield onto pA, which
+  latches the floor-to-roof exit gate d_a. | checkpoint 0.
+- **ROOM B — THE HOLLOW** (husk + helm): a husk **sealed in a basement under the
+  main floor** (rows 20-22 carved open, cols 56-66; solid roof at row 19, sub-
+  floor row 23). The player walks the floor above and can never get in; the husk
+  can never get out — so connecting at the helm and driving it onto pB (which
+  latches the player's gate d_b) is the only way through. The camera drops to the
+  husk on connect (the reveal). | checkpoint 1.
+- **ROOM C — THE STILLNESS** (Listener + husk, mirrored stillness): a Listener
+  with the new **`hearsHusks`** flag also lunges at — and is killed by — a husk
+  that *moves* near its open eye. Drive the husk past the eye (freeze it whenever
+  the eye opens) onto pC → d_c latches; then disconnect and cross on foot,
+  freezing yourself on the eye. Both you and your husk must hold still. | checkpoint 2.
+- **THE CORE** (the ending): walk into the glowing mass (a `core` entity) →
+  control flips. The player and the husk crowd walk in unison to the far wall (a
+  `door` tagged `links:['_wall']`, which no signal opens during play), push it
+  open, then a warm whiteout → the HOLLOW title card → a credits scroll → back to
+  the title (the save is cleared). | checkpoint 3 at the chamber entrance.
+
+**Deviations from the sketch above** (recorded per the hard rule):
+1. **Room B is a calm single-husk sealed-basement beat, not a "husk desync + lift
+   + timed-plate orchestra."** Desync was taught in full in Ch.5 and the husk/lift
+   counterweight in Ch.3/Ch.6; a robust desync of two mirror-driven husks needs
+   delicate jump-window tuning (their 18 px solidity offset makes the separation
+   window tiny) and a non-bypassable husk puzzle on a *flat* floor isn't possible
+   anyway (the player can just stand on the plate) — it needs a sealed chamber.
+   So Room B uses the sealed-chamber idiom robustly; the gauntlet's genuinely new
+   beat is Room C. The lift is omitted (its two rooms are Ch.3 and Ch.6).
+2. **Room C is LIT, not dark.** Darkness is a per-*chapter* flag (whole-level
+   mask), so a chapter can't mix lit puzzle rooms (A's beams must read) with a
+   single dark room without a new regional-darkness feature (out of scope for a
+   victory-lap). The Listener's growl + glowing-eye tell reads fine in the light.
+3. **"Mirrored stillness" is realized by `hearsHusks`** (new engine flag): a
+   Listener that hears husks charges at and is killed by a *moving* husk, so a
+   driven husk must freeze on the eye exactly as the player does. The "you both
+   stand still" tension is real because the husk is now at risk too.
+4. The ending is its own `Game.state === 'ending'` cinematic (no `exit` entity in
+   the chapter — the Core is the terminus); after the credits, **any key** (not
+   "press R") returns to the title.
 
 ## Engine features still needed (referenced above)
 
@@ -273,7 +338,10 @@ cinematic state). After credits: "press R" → title.
 - ~~Breath timer + drowning + screen-darkening tell.~~ done (T5)
 - ~~Scripted chase trigger (ch. 7D) — a zone that forces a long charge.~~ done (T5: `trigger` entity)
 - ~~Lift brake/lock (`lift.lock`) — a signal freezes a counterweight lift.~~ done (session 11; used Ch.3 Room C)
-- Ending cinematic state (ch. 8) + credits. *(T13)*
+- ~~Ending cinematic state (ch. 8) + credits.~~ done (T13: `Game.state==='ending'`,
+  `updateEnding`/`drawEnding`/`CREDITS` in game.js; the `core` entity is the
+  trigger, a `links:['_wall']` door is the wall they push open). Also added the
+  `creature.hearsHusks` flag (Ch.8 Room C mirrored stillness).
 - ~~Save/continue, pause menu, title screen.~~ done (T3 save + T5 pause/title menus)
 
 ## Difficulty / pacing principles

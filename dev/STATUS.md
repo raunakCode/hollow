@@ -1,6 +1,202 @@
 # HOLLOW — status
 
-_Last updated: 2026-06-21 (session 17)._
+_Last updated: 2026-06-25 (session 20)._
+
+## Session 20 — T13 done: Ch.8 THE CORE + the ENDING cinematic (the game is content-complete)
+
+Built **Chapter 8 — THE CORE** as `LEVELS[7]` in `js/levels2.js` (was the last
+stub) **and the ending cinematic** — the final T13 deliverable and the last
+named engine TODO. With Ch.8 in, all 8 chapters + the ending exist; only T14
+(full-game polish) remains. 170×24, seed 108, interior, **flat floor** (rows
+19-23, the safest authoring base — like Ch.7), warm glow building toward the
+Core, no hints (the player is fully experienced). A short victory-lap gauntlet
+recombining shipped mechanics, then the Core chamber. Authored with a throwaway
+column generator (`dev/_gen_ch8.js`, deleted) and validated by driving the engine
+in the new **`dev/ch8.js`** (18 checks).
+
+- **ROOM A — THE GLARE** (lights + box + plate). Two searchlights sweep a
+  **roofed** strip (rows 13-15, cols 12-33 — so a beam can't be jumped over) and
+  overlap into an **always-lit seam** (standing in it is lethal → no clean dash;
+  the harness proves this). Push the box through as a rolling shadow-shield onto
+  pA, which latches the floor-to-roof exit gate d_a. | checkpoint 0.
+- **ROOM B — THE HOLLOW** (husk + helm). A husk **sealed in a basement UNDER the
+  main floor** (rows 20-22 carved open, cols 56-66; solid roof at row 19, sub-
+  floor row 23). The player walks the floor above it and can **never get in**; the
+  husk can **never get out** (solid roof) — so connecting at the helm and driving
+  it onto pB (which latches the player's gate d_b) is the only way through. The
+  **camera drops to the husk on connect** (the reveal). | checkpoint 1.
+- **ROOM C — THE STILLNESS** (Listener + husk, *mirrored stillness*). A Listener
+  with the **new `hearsHusks` flag** also lunges at — and is killed by — a husk
+  that **moves** near its open eye. Drive the husk past the eye (freeze it
+  whenever the eye opens) onto pC → d_c latches; then disconnect and cross on
+  foot, freezing **yourself** on the eye. Both you and your husk must hold still.
+  | checkpoint 2.
+- **THE CORE** (the ending). Walk into the **glowing mass** (a new `core` entity)
+  → control flips to **`Game.state==='ending'`**. The player and the husk crowd
+  walk in **unison** to the far wall (a `door` tagged `links:['_wall']`, which no
+  signal opens in play), push it open, then a **warm whiteout** → the **HOLLOW
+  title card** → a **credits scroll** → back to the **title** (the save is
+  cleared). | checkpoint 3 at the chamber entrance.
+
+- **Three engine additions** (all backward-compatible):
+  1. **`core` entity + `Render.core`** — a warm pulsing radial bloom (the one warm
+     light in the game), drawn with `lighter` compositing; the world's new `cores`
+     array; touching it in `updatePlay` calls `startEnding()`.
+  2. **`creature.hearsHusks`** — gated husk detection in `updateCreatures`: in
+     `alert`, a husk that's near + noisy triggers a lunge at the husk; a charge
+     that hits a husk is fatal (it's your body). Default false = every existing
+     creature (Ch.7, testmap) is unchanged.
+  3. **The ending state** — `updateEnding`/`drawEnding`/`drawCredits` + the
+     `CREDITS` list in game.js; routed in `frame()` alongside play/title; the
+     wall is animated directly (the ending doesn't run `updateDoors`, so the
+     `_wall` link staying unsatisfied keeps it a solid wall during play).
+- **The two design problems the build forced (and the deviations recorded):**
+  1. **Room B can't be a flat-floor husk-on-plate puzzle** — the player can just
+     stand on the plate (bypass). A non-bypassable husk puzzle needs a *sealed*
+     chamber (Ch.5's idiom). Hence the under-floor basement. And the planned
+     "husk desync + lift + timed-plate orchestra" was dropped: a robust desync of
+     two mirror-driven husks needs frame-perfect jump tuning (their 18 px solidity
+     offset makes the separation window tiny — the first build had **both** husks
+     mantle the step). Desync was taught in full in Ch.5 and the lift in Ch.3/Ch.6,
+     so Room B is a clean sealed-chamber beat and the gauntlet's genuinely new beat
+     is Room C.
+  2. **Room C is LIT, not dark** — darkness is a per-*chapter* flag (whole-level
+     mask), so one chapter can't mix lit puzzle rooms (A's beams must read) with a
+     single dark room without a new regional-darkness feature (out of scope for a
+     victory-lap). The Listener's growl + glowing-eye tell reads fine in the light.
+  Both folded into `dev/DESIGN.md` Ch.8 (now "Built form", 4 deviations) + the
+  ending TODO marked done; `dev/ARCHITECTURE.md` updated (`core`/`hearsHusks`
+  entity defs, `cores` array, `Render.core`, the `ending` state machine).
+- **A harness gotcha worth noting** (cost one red→green cycle): a door object
+  cached in a `const` across a `startCh8()` is **stale** — `loadChapter` rebuilds
+  `Game.world` with fresh entity objects, so look doors up *after* each reset.
+- **Verified:** `node dev/headless.js` ALL PASS, `dev/fuzz.js` FUZZ CLEAN (8
+  seeds), `dev/t5.js` ALL PASS, `dev/ch1.js`…`ch7.js` ALL PASS, **`dev/ch8.js`
+  ALL PASS** (18 checks: sanity; A always-lit-seam-is-lethal + box-shield-crosses-
+  and-latches-d_a; B player-can't-reach-sealed-pB + driven-husk-latches-d_b +
+  husk-can't-escape-the-basement; C husk-moving-near-open-eye-kills + still-husk-
+  safe + careful-drive-latches-d_c + player-crosses-on-foot; CORE touch-starts-
+  ending + wall-opens + whiteout→card→credits→end→title + save-cleared). Updated
+  `dev/ch7.js`'s exit assertion (Ch.7 now advances to Ch.8 `chapterIdx===7`, not
+  title). Browser render (throwaway playwright) of all rooms + the **full ending**
+  (unison walk, warm whiteout, the HOLLOW card, the credits scroll, return to
+  title) **clean (0 console errors, 121 fps)** — captures show the Core as a warm
+  orb with the husk crowd, the basement reveal, the beam strip, and the title card.
+- **Still needs the user (Ch.8 + ending feel sign-off):** play THE CORE. Does the
+  glare's box-shield read after Ch.2/Ch.6? Is the sealed-basement reveal (camera
+  drop) legible — is it clear you're driving a body you can never reach? Does Room
+  C's *you-both-freeze* land (is it clear the Listener now hears the husk)? And
+  the ending — does the unison walk into the wall, the whiteout, the card, and the
+  credits feel like an *ending*, or does it need more weight/pacing (walk speed,
+  whiteout timing, credits scroll rate are all easy to tune)? Machine-verified ≠
+  feel-verified. The interior palette is dark — Room C especially reads dim in
+  captures; may want a touch more ambient light.
+- **Post-build fix (user-reported):** jumping straight to Ch.8, "I can't see my
+  own character." Confirmed (brightened capture): the figure renders fine but the
+  spawn (col 3) is unlit and a dark silhouette vanishes into the near-black
+  interior ground (tiles are a fixed `#06080c`) until you reach Room A's first
+  beam. Added an opt-in chapter flag **`playerGlow`** (Ch.8 only) → `drawPlay`
+  draws a faint *additive* presence halo BEHIND the player + husks (lit chapters
+  only; gated off for `dark`), so you stay locatable without lifting the
+  silhouette. Other chapters are untouched (no flag = no code path). Re-verified:
+  ch8/headless ALL PASS, ending render still clean (0 errors, 121 fps); the spawn
+  figure now reads at normal brightness. (Ch.5/Ch.6 interiors may have the same
+  dim-spawn issue — left as a polish item for T14 unless the user hits it.)
+
+## Session 19 — dev tooling: title chapter-select (jump to any chapter for testing)
+
+Added a **dev chapter-select** to the title so any chapter can be booted directly
+(the user wanted faster testing). On the title, `` ` `` (Backquote) toggles a
+"JUMP TO CHAPTER" overlay listing all 7 chapters; up/down move the cursor, a digit
+**1-9 jumps straight in**, confirm enters the cursor's chapter, Esc closes. A faint
+`` `  chapters`` hint sits bottom-left of the title.
+
+- **Implementation:** `Input.digitPressed()` (util.js, returns 1-9/0);
+  `Game.selecting`/`Game.selectSel` state; `updateChapterSelect()` +
+  `jumpToChapter(i)` + `drawChapterSelect()` in game.js. The toggle is handled
+  **before** the any-key "new game" path so pressing `` ` `` can't double as
+  starting the game. `jumpToChapter` does a clean `loadChapter(i)` and does **not**
+  write the save — the real continue-save is preserved (checkpoints reached after
+  a jump still save as usual).
+- **Verified:** `node dev/headless.js` ALL PASS, `dev/ch1.js` + `dev/ch7.js` ALL
+  PASS (unchanged — title-only feature). Browser-driven check (throwaway
+  playwright script): `` ` `` opens the overlay, ArrowDown increments the cursor
+  per press, `Digit5` jumps straight to `chapterIdx===4` (THE HUSKS) in `play`
+  with `selecting` cleared, **0 console errors**; screenshot confirms the overlay
+  reads (HOLLOW + the 7-chapter list with the cursor highlight).
+
+## Session 18 — T12 done: Ch.7 THE DEEP built (darkness + Listener red-light/green-light + chase finale)
+
+Built **Chapter 7 — THE DEEP** as `LEVELS[6]` in `js/levels2.js` (was the stub).
+The first **Listener** chapter and the first **dark** chapter. The whole thing is
+**red-light / green-light**: a Listener cycles dormant → waking (0.8 s growl
+warning) → alert (eye GLOWS); while the eye is open, *moving* near it triggers a
+lethal charge, *standing still* is always safe. 226×24, seed 107, cavern,
+`dark: true`, **no hints**. Flat continuous floor (row 18) so darkness never
+causes a cheap fall; authored with a throwaway column generator (deleted) and
+validated by driving the engine in the new **`dev/ch7.js`** (24 checks). Four
+rooms, 5 checkpoints (every segment; all death-reset safe — Ch.7 has no
+irreversible puzzle STATE, only positioning, so a checkpoint can sit anywhere):
+
+- **ROOM A — THE FIRST EYE.** One Listener astride the path; learn the growl/eye
+  tell. Its body isn't solid (you walk past it); only the charge kills. | check 0/1.
+- **ROOM B — THE TWO.** Two Listeners 12 tiles apart with overlapping danger zones
+  on **independent** (per-creature seeded) cycles, so the "both eyes shut" windows
+  are short/irregular — stop-and-go, freeze when EITHER opens. Grass tufts mark
+  rest spots (flavor — stillness is what saves you). | check 2.
+- **ROOM C — THE FLOODED HOLLOW.** A short submerged crossing (water rows 14-17
+  over the floor, cols 120-130) past a submerged Listener. Bottom-walk it; the
+  safe freeze is standing still on the floor (grounded). Breath stays generous
+  (cross a green window from the dry edge). | check 3.
+- **ROOM D — THE COLLAPSE (finale).** Entering WAKES the chaser (growl + glowing
+  eye behind you, no lunge); stepping plate **pD** opens the exit door **dD**
+  (which then DESCENDS as the plate-hold expires) AND lunges the chaser at the
+  plate — slide under dD before it seals; dawdling on pD is swept. Exit → title
+  (Ch.7 is the last built chapter). | check 4 at the finale entrance.
+
+- **One engine feature (render):** dark chapters now glow the Listener eyes.
+  `drawPlay` (game.js) builds the darkness-mask holes as the player glow PLUS one
+  hole per creature at its eye, radius/alpha scaled by `c.eye` — an OPEN eye reads
+  as a glowing pool in the black (the red-light tell), a shut eye punches nothing.
+  Backward-compatible (no creatures / no dark = unchanged).
+- **The bug the harness caught (validate-by-driving again):** a creature's body
+  bottom sits at `(def.y+1)*TILE`, so placing it ON the solid floor row embeds its
+  rect in that tile and `rectHitsSolidTiles` **self-aborts every charge** (a
+  Listener that can never lunge). Fix: creatures go one row ABOVE the floor (floor
+  row 18 → `y:17`; cf. testmap floor row 16 → `y:15`). Recorded in DESIGN/ARCH.
+- **Finale tuning:** a true continuous pursuit is unwinnable (charge 560 > run
+  215), so the chaser gets a tiny natural `range:4` and is driven ONLY by the
+  `trigger` zones (a `'wake'` tell on entry, a `'charge'` lunge on the plate) — the
+  threat is "don't hesitate on the plate," not "outrun it forever." The first
+  harness run died mid-sprint because a larger range let the *natural* alert→charge
+  catch the runner; shrinking the range fixed it.
+- **Two DESIGN deviations recorded:** (1) "float motionless" (Room C) is impossible
+  — an idle submerged player sinks ~170 px/s (over the `|vy|>80` noise threshold) —
+  so the freeze is a floor-stand, and the Listener is at floor level so its
+  horizontal charge can overlap the player (hence bottom-walk, not surface swim).
+  (2) the "closing door" is the engine's top-anchored door closing (slab grows
+  downward = a descending shutter you slide under).
+- **Bookkeeping done:** updated `dev/ch6.js`'s exit assertion (Ch.6 now advances to
+  Ch.7 `chapterIdx===6`, not title); Ch.7's exit is the new last→title (automatic).
+  Folded the 2 deviations + engine notes into `dev/DESIGN.md` Ch.7 (now "Built
+  form"); updated `dev/ARCHITECTURE.md` (dark-chapter eye holes, creature-placement
+  gotcha, ch7.js).
+- **Verified:** `node dev/headless.js` ALL PASS, `dev/fuzz.js` FUZZ CLEAN (8 seeds),
+  `dev/t5.js` ALL PASS, `dev/ch1.js`…`ch6.js` ALL PASS, **`dev/ch7.js` ALL PASS**
+  (24 checks: sanity; eye cycle; still-is-safe vs move-is-lethal; the 0.8 s growl
+  is a true no-charge warning; A careful crossing; B independent cycles + stop-and-go
+  crossing; C idle-sinks-to-floor + floor-stand-safe + crossing-without-drown; D
+  entry-wake + pD-opens-dD + door re-seals + door-required + dawdle-swept + full-
+  sprint-slides-under-dD→exit→title). Browser render of all four rooms **clean (0
+  console errors)** — brightened captures show the player glow, the glowing eyes
+  through the dark (one in A, two in B, a submerged one in the C pool), and the
+  finale, all reading correctly.
+- **Still needs the user (Ch.7 feel sign-off):** play THE DEEP. Does the eye/growl
+  tell read in the dark (is the glowing-eye-as-red-light legible)? Is the freeze
+  window fair (esp. Room C underwater, where stopping is a touch slower)? Are Room
+  B's two independent cycles tense-but-solvable? Does the finale land — the
+  descending-door slide + the "don't dawdle on the plate" lunge — and is the slide
+  window comfortable? Machine-verified ≠ feel-verified.
 
 ## Session 17 — T11 done: Ch.6 THE MACHINES built (the husks×lights×lifts×timed-plates synthesis)
 
