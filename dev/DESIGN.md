@@ -39,12 +39,17 @@ seconds after stepping off (timed-door puzzles). **Doors**: open when linked
 signals are active (`all` or `any` mode); `latch: true` = stays open forever
 once triggered (use after puzzles so death-reset can't strand the player).
 
-**Searchlights**: sweeping cones. Detection fills in ~0.4 s, then a dart
-kills you. Blocked by tiles, boxes, and closed doors. Crouching in grass
-('G' tiles) makes you invisible. **Lights ignore husks** — that asymmetry is
-a core puzzle tool. Lights take an optional `offWhen` (a signal id or list of
-ids): while any listed signal is active the cone powers down — no detection,
-dimmed in render (implemented T5).
+**Searchlights**: sweeping (or fixed) cones. Detection fills in ~0.4 s, then a
+dart kills you. Blocked by tiles, boxes, and closed doors. Detection samples
+the figure's **head AND centre** (lit if either has a clear line to the beam),
+so a 1-tile box hides your centre but not a *standing* head — to vanish behind
+box cover you must **crouch** fully into its shadow (matches the visible cone;
+fixes the old "looks lit but safe" mismatch). Crouching in grass ('G' tiles)
+makes you invisible. **Lights ignore husks** — that asymmetry is a core puzzle
+tool. Lights take an optional `offWhen` (a signal id or list of ids): while any
+listed signal is active the cone powers down — no detection, dimmed in render
+(implemented T5). A light with `a0==a1` & `speed:0` is a **steady** beam (no
+sweep, no timing gap).
 
 **Husks + helms**: stand at a helm, press X/E: you slump and *every husk the
 helm controls mirrors your directional input simultaneously*. A helm controls
@@ -128,8 +133,9 @@ grows → crouch through a gap under the fence → exit.
 Light 1 sweeps an open yard dotted with grass patches: dash patch-to-patch
 during the off-sweep, crouch to hide. Checkpoint. Light 2 guards a 3-tile
 wall: time the mantle. Light 3 watches a lever that opens the gate (latch):
-push a box into the beam's line to create standing shadow, pull lever from
-cover. Checkpoint after gate. Exit into the facility.
+push a box into the beam's line and **crouch fully behind it** (standing leaves
+your head lit), pull the lever from cover. Checkpoint after gate. Exit into the
+facility.
 
 ### Ch. 3 — THE YARD (boxes, plates, lift + brake; interior bg)
 Built form (session 12; see dev/CH3_REWORK.md for the design history). Three
@@ -290,10 +296,20 @@ tile and `rectHitsSolidTiles` self-aborts every charge. (Floor row 18 → creatu
 ### Ch. 8 — THE CORE (everything; interior bg, strange warm glow) — Built form
 A short victory-lap gauntlet (flat interior floor, rows 19-23; 170×24, seed 108,
 no hints) recombining shipped mechanics, then the Core chamber + the ending.
-- **ROOM A — THE GLARE** (lights + box): two searchlights sweep a roofed strip
-  (rows 13-15, cols 12-33 — so a beam can't be jumped over) with an always-lit
-  seam (no clean dash). Push the box as a rolling shadow-shield onto pA, which
+- **ROOM A — THE GLARE** (light + box): one **steady** beam at the far (east) end
+  of a roofed strip (rows 13-15, cols 12-33 — so a beam can't be jumped over),
+  aimed straight back down the corridor (west). It never sweeps, so there is no
+  timing gap to dash through and the lit strip is impassable on foot. Push the
+  box east as a rolling shadow-shield and CROUCH-walk in its shadow (the box
+  stays between you and the beam; standing leaves your head lit) onto pA, which
   latches the floor-to-roof exit gate d_a. | checkpoint 0.
+  - *Revision (post-build):* originally **two sweeping** searchlights, but the
+    sweeps left a window you could simply outrun (the box was skippable). Replaced
+    with the single steady west-aimed beam — no timing gap, and the box is now
+    genuinely required as cover. Verified: a no-box sprint (any timing, jumping,
+    crouching) is caught; the crouch-shielded push crosses with zero detection.
+    (Detection now samples the head too — see Searchlights above — so you can't
+    stand behind the 1-tile box with your head in the beam and be safe.)
 - **ROOM B — THE HOLLOW** (husk + helm): a husk **sealed in a basement under the
   main floor** (rows 20-22 carved open, cols 56-66; solid roof at row 19, sub-
   floor row 23). The player walks the floor above and can never get in; the husk

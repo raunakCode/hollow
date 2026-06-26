@@ -157,32 +157,43 @@ const bareDied = !survive(900);
 releaseAll();
 check('lever is lethal without the box', bareDied, at());
 
-console.log('-- LIGHT 3 / STAGE A: the box casts a standing shadow over the lever');
-startCh2(); place(86);
+console.log('-- LIGHT 3 / STAGE A: STANDING behind the box leaves the head in the beam (caught)');
+startCh2(); place(86);                     // STAND at the lever
+const sboxS = Game.world.boxes[0];
+sboxS.x = P().x + P().w + 1; sboxS.y = FLOOR - 30; sboxS.vx = 0; sboxS.vy = 0; sboxS.grounded = true;
+const standCaught = !survive(420);
+releaseAll();
+check('standing behind the box is caught (head pokes above it)', standCaught, at());
+
+console.log('-- LIGHT 3 / STAGE A: CROUCHING fully behind the box shadows the lever pull');
+startCh2(); place(86, true);               // CROUCH at the lever
+keyDown('ArrowDown');                      // hold the crouch (no low roof forces it here)
 const sbox = Game.world.boxes[0];
 sbox.x = P().x + P().w + 1; sbox.y = FLOOR - 30; sbox.vx = 0; sbox.vy = 0; sbox.grounded = true;
-const shadowSurvived = survive(420);       // ~7s in the box's shadow
-check('box shadow protects the lever pull', shadowSurvived, at());
+const shadowSurvived = survive(420);       // ~7s tucked in the box's shadow
+check('crouching behind the box protects the lever pull', shadowSurvived, at());
 if (Game.state === 'play') {
-  tap('KeyX');                             // pull the lever
+  tap('KeyX');                             // pull the lever (still crouched)
   frames(120);                             // let the gate run up (latch)
   check('lever latches the gate open', lever().on && door().open, `on=${lever().on} open=${door().open}`);
 }
+releaseAll();
 
-console.log('-- LIGHT 3 / STAGE A: full traversal — shield to lever, over the box+step, to checkpoint 1');
+console.log('-- LIGHT 3 / STAGE A: full traversal — crouch-shield to lever, over the box+step, to checkpoint 1');
 startCh2(); place(79);                      // left of the box (col 81)
-keyDown('ArrowRight');
+keyDown('ArrowRight'); keyDown('ArrowDown'); // crouch-push, staying fully in the box's shadow
 let pushAlive = true, pulled = false;
-// phase 1: push the box through the lit zone (shield), pull the lever in its shadow
-for (let i = 0; i < 1200; i++) {
+// phase 1: crouch-push the box through the lit zone (shield), pull the lever in its shadow
+for (let i = 0; i < 2000; i++) {
   frames(1);
   if (Game.state !== 'play') { pushAlive = false; break; }
   if (!pulled) {
     const p = P(), l = lever();
-    if (p.x - 6 < l.x + l.w && p.x + 24 > l.x) { tap('KeyX'); keyDown('ArrowRight'); pulled = true; }
+    if (p.x - 6 < l.x + l.w && p.x + 24 > l.x) { tap('KeyX'); keyDown('ArrowRight'); keyDown('ArrowDown'); pulled = true; }
   }
-  if (P().x >= 90 * TILE) break;            // reached the end of the lit zone (box ahead)
+  if (P().x >= 93 * TILE) break;            // box jammed against the step, at the fixture
 }
+keyUp('ArrowDown');                         // past the beam — stand to clamber the box+step
 check('survived the shielded push past the lever', pushAlive, at());
 check('pulled the lever from cover, gate latched', pulled && door().open, `pulled=${pulled} open=${door().open}`);
 // phase 2: clamber over the box, through the open gate, up the step to checkpoint 1

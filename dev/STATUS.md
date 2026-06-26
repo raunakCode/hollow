@@ -1,6 +1,61 @@
 # HOLLOW — status
 
-_Last updated: 2026-06-25 (session 20)._
+_Last updated: 2026-06-26 (session 21)._
+
+## Session 21 — Ch.8 Room A (THE GLARE) redesign + honest light detection
+
+### Light detection now samples the head, not just the centre
+
+Second playtest note: behind the box you didn't have to crouch — you could push
+it standing and stay safe even though the beam was clearly on your head. Root
+cause: light detection raycast only ever tested the player's **centre** point,
+which a 1-tile box always covers, while the visible cone (correctly) splashed
+over the standing head poking above the box. So the *visual* was right and the
+*detection* was wrong.
+
+Fix (`js/entities.js`): factored the per-point sightline test into
+`lightSeesPoint(Lt, level, world, px, py)` and `updateLights` now calls it for
+**both the head (`player.y+6`) and the centre** — lit if either has a clear
+line. A standing figure's head sticks ~12px above the 1-tile box, so you must
+now **crouch fully behind cover** to vanish (crouched head sits ~9px *below* the
+box top). This is strictly *more* detection, so it only changes partial-cover
+situations — the exact "looks lit but safe" bug, in two places:
+- **Ch.8 Room A** (the new steady glare) — crouch-push the box across.
+- **Ch.2 Light 3a** (gate-house lever) — crouch behind the box to pull the lever.
+
+Both level comments + DESIGN updated; added a `↓` crouch hint at the Ch.2 gate-
+house; the ch2/ch8 harnesses now assert *standing* behind the box is caught and
+*crouching* survives. The other six chapters' light beats are unaffected
+(verified: **`node dev/ch1..8.js` all PASS**).
+
+### Ch.8 Room A (THE GLARE) redesign: the box is no longer skippable
+
+Playtest found the original Room A was solvable by **just running through the
+lights** — the two sweeping searchlights left a window you could outrun, so the
+box (the intended "rolling shadow-shield") was decorative. Root cause: light
+detection ramps over ~0.42 s, and a full-speed runner (215 px/s) clears each
+narrow sweeping cone in less than that, so detection never fills. Even the
+*intended* box-push only got the player to ~0.48 detection — the box barely
+shielded (two flanking down-pointing lights can't both be blocked by one box).
+
+**Fix (data-only, no engine change):** replaced the two sweeping lights with a
+single **steady** beam at the far (east) end of the roofed strip, aimed straight
+back down the corridor (west, fixed `a0==a1`, `speed:0`). Because it never sweeps
+there is no timing gap, and the roof still blocks jumping over it — the lit strip
+is impassable on foot. Aimed west so the player (entering from the west) is always
+on the shielded side of the box they push east; the box stays between them and
+the beam the whole way.
+
+Verified in a logic sim driving the real engine (`scratchpad/designA.js`) and in
+real Brave:
+- no-box sprint dies at **every** start delay 0–220 frames, and while jumping or
+  crouching (no timing/jump/crouch escape);
+- box-shield push completes the room (latches d_a, reaches checkpoint 0) with
+  **zero** detection — the box reliably casts the shadow;
+- rooms B/C and the ending are untouched. `dev/ch8.js` updated (its old box-push
+  test placed the player **east** of the box, so it never actually pushed it —
+  that masked the exploit) and now also asserts the no-box sprint is caught.
+  Full `node dev/ch8.js` → ALL PASS.
 
 ## Session 20 — T13 done: Ch.8 THE CORE + the ENDING cinematic (the game is content-complete)
 

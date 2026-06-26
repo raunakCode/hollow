@@ -3,9 +3,10 @@
 // HOLLOW - dev/ch8.js : Chapter 8 (THE CORE) walkthrough harness.
 // Loads the REAL chapter list (LEVELS[7] = Ch.8) and proves the gauntlet +
 // the ending cinematic:
-//   ROOM A — THE GLARE. The roofed beam strip has an always-lit seam (standing
-//     in it is lethal -> no clean dash), so the box shadow is required; a
-//     box-shield push crosses alive and latches the exit gate d_a.
+//   ROOM A — THE GLARE. A single STEADY beam down the roofed strip (no sweep ->
+//     no timing gap; can't be jumped over or outrun), so the box shadow is
+//     required: a no-box sprint is caught, while a box-shield push crosses alive
+//     and latches the exit gate d_a.
 //   ROOM B — THE CHORUS. Driving both husks right + a jump at the step desyncs
 //     them (one onto pBhi, one onto pBlo) and latches d_b; a naive no-jump walk
 //     leaves both low (only pBlo) and the gate stays shut.
@@ -147,25 +148,52 @@ check('the Listener hears husks', cre(0).hearsHusks === true);
 check('the wall (links _wall) starts shut', doorLinking('_wall') && doorLinking('_wall').openT < 0.1);
 
 // ============================ ROOM A ============================
-console.log('-- ROOM A: the beam strip has an always-lit seam (standing in it is lethal)');
+console.log('-- ROOM A: standing in the steady beam is lethal');
 startCh8();
-place(24, 18);                                  // stand in the strip seam, never move
-const seamDied = step(420);                     // a full sweep cycle+ (no box shadow)
-check('standing still in the strip seam gets caught (no clean dash window)', seamDied,
+place(24, 18);                                  // stand in the lit strip, never move
+const seamDied = step(180);                     // the beam is steady -> caught fast
+check('standing still in the beam gets caught', seamDied,
   `died=${seamDied} state=${Game.state}`);
 
-console.log('-- ROOM A: a box-shield push crosses the strip alive and latches the exit gate d_a');
+console.log('-- ROOM A: running the strip WITHOUT the box gets caught (the exploit this fixes)');
 startCh8();
-place(8, 18);                                   // just left of the box (col 7)
-let aDied = false;
-for (let i = 0; i < 900 && col(P()) < 37; i++) {
-  keyDown('ArrowRight');                         // push the box east the whole way
+for (const b of W().boxes) b.x = -10000;        // remove the box entirely
+place(10, 18);                                  // already inside the strip
+let aRunDied = false;
+for (let i = 0; i < 900 && col(P()) < 40; i++) {
+  keyDown('ArrowRight');                         // sprint straight through, no cover
   frames(1);
-  if (Game.state !== 'play') aDied = true;
+  if (Game.state !== 'play') { aRunDied = true; break; }
+}
+releaseAll();
+check('a no-box sprint through the glare is caught (cannot be outrun)', aRunDied,
+  `died=${aRunDied} col=${col(P()).toFixed(1)} state=${Game.state}`);
+
+console.log('-- ROOM A: STANDING behind the box leaves your head in the beam (caught)');
+startCh8();
+place(3, 18);                                   // WEST of the box (col 7)
+let aStandDied = false;
+for (let i = 0; i < 1600 && col(P()) < 37; i++) {
+  keyDown('ArrowRight');                         // push standing — head pokes above the box
+  frames(1);
+  if (Game.state !== 'play') { aStandDied = true; break; }
+}
+releaseAll();
+check('pushing the box while STANDING is caught (head above the box)', aStandDied,
+  `died=${aStandDied} col=${col(P()).toFixed(1)} state=${Game.state}`);
+
+console.log('-- ROOM A: CROUCH-pushing the box (fully in its shadow) crosses alive and latches d_a');
+startCh8();
+place(3, 18);                                   // WEST of the box (col 7) so we drive it east
+let aDied = false;
+for (let i = 0; i < 2600 && col(P()) < 37; i++) {
+  keyDown('ArrowRight'); keyDown('ArrowDown');   // crouch-push: stay fully behind the box
+  frames(1);
+  if (Game.state !== 'play') { aDied = true; break; }
 }
 releaseAll();
 const dA = doorLinking('pA');
-check('pushed the box across the beams alive and latched d_a',
+check('crouch-pushed the box across the glare alive and latched d_a',
   !aDied && dA.open,
   `died=${aDied} d_a.open=${dA.open} col=${col(P()).toFixed(1)}`);
 

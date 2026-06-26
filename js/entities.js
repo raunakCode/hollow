@@ -232,6 +232,35 @@ function updateLifts(world, dt, heavies) {
   }
 }
 
+// True if `Lt` has an unobstructed sightline to world-point (px,py): in range,
+// inside the cone, and not blocked by a solid tile / box / closed door. The
+// caller samples more than one body point (head + center) so a silhouette that's
+// only PARTLY behind cover still reads as lit — matching the visible cone. (A box
+// is ~1 tile tall and the player ~1.3: a standing figure's head pokes above it,
+// so center-only detection used to leave you safe while the beam was clearly on
+// your head. Now you must crouch fully behind the cover to vanish.)
+function lightSeesPoint(Lt, level, world, px, py) {
+  const dx = px - Lt.x, dy = py - Lt.y;
+  const d = Math.sqrt(dx * dx + dy * dy);
+  if (d >= Lt.len || d <= 8) return false;
+  let da = Math.atan2(dy, dx) - Lt.ang;
+  while (da > Math.PI) da -= Math.PI * 2;
+  while (da < -Math.PI) da += Math.PI * 2;
+  if (Math.abs(da) >= Lt.fov / 2) return false;
+  const steps = Math.ceil(d / 14);
+  for (let i = 1; i < steps; i++) {
+    const sx = Lt.x + dx * (i / steps), sy = Lt.y + dy * (i / steps);
+    if (isSolidTile(tileAt(level, Math.floor(sx / TILE), Math.floor(sy / TILE)))) return false;
+    for (const b of world.boxes)
+      if (sx > b.x && sx < b.x + b.w && sy > b.y && sy < b.y + b.h) return false;
+    for (const dr of world.doors) {
+      const hh = dr.h * (1 - dr.openT);
+      if (sx > dr.x && sx < dr.x + dr.w && sy > dr.y && sy < dr.y + hh) return false;
+    }
+  }
+  return true;
+}
+
 function updateLights(world, level, player, hidden, dt) {
   let maxDanger = 0;
   let killed = false;
@@ -246,33 +275,14 @@ function updateLights(world, level, player, hidden, dt) {
     Lt.disabled = !!(Lt.offWhen && (Array.isArray(Lt.offWhen)
       ? Lt.offWhen.some(id => sig[id]) : sig[Lt.offWhen]));
     if (Lt.disabled) { Lt.detect = Math.max(0, Lt.detect - dt * 3); continue; }
-    // detect player
-    const pcx = player.x + player.w / 2, pcy = player.y + player.h / 2;
-    const dx = pcx - Lt.x, dy = pcy - Lt.y;
-    const d = Math.sqrt(dx * dx + dy * dy);
-    let seen = false;
-    if (!hidden && d < Lt.len && d > 8) {
-      let da = Math.atan2(dy, dx) - Lt.ang;
-      while (da > Math.PI) da -= Math.PI * 2;
-      while (da < -Math.PI) da += Math.PI * 2;
-      if (Math.abs(da) < Lt.fov / 2) {
-        // raycast for occlusion (tiles + boxes + closed doors)
-        seen = true;
-        const steps = Math.ceil(d / 14);
-        for (let i = 1; i < steps; i++) {
-          const sx = Lt.x + dx * (i / steps), sy = Lt.y + dy * (i / steps);
-          if (isSolidTile(tileAt(level, Math.floor(sx / TILE), Math.floor(sy / TILE)))) { seen = false; break; }
-          let blocked = false;
-          for (const b of world.boxes)
-            if (sx > b.x && sx < b.x + b.w && sy > b.y && sy < b.y + b.h) { blocked = true; break; }
-          if (!blocked) for (const dr of world.doors) {
-            const hh = dr.h * (1 - dr.openT);
-            if (sx > dr.x && sx < dr.x + dr.w && sy > dr.y && sy < dr.y + hh) { blocked = true; break; }
-          }
-          if (blocked) { seen = false; break; }
-        }
-      }
-    }
+    // detect player — sample the HEAD and the CENTER, lit if either has a clear
+    // line to the beam. A waist-high box hides the center but not a standing
+    // head, so you must crouch fully behind cover to vanish (matches the cone).
+    const pcx = player.x + player.w / 2;
+    const seen = !hidden && (
+      lightSeesPoint(Lt, level, world, pcx, player.y + 6) ||             // head
+      lightSeesPoint(Lt, level, world, pcx, player.y + player.h / 2)     // center
+    );
     if (seen) {
       Lt.detect += dt * 2.4;
       Lt.tick -= dt;

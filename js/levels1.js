@@ -76,8 +76,9 @@ LEVELS.push({
 //   a step over it). Two stages:
 //     A. an angled beam (3a) trained on the gate lever (86) — it's ALWAYS lit
 //        there, so you can't run-up and pull it; push the box (waits at 81) in
-//        as a moving shadow, pull the lever from its cover, the gate (96)
-//        latches open. Checkpoint just past the gate (97).
+//        as a moving shadow and CROUCH behind it (standing leaves your head in
+//        the beam — detection samples the head, not just the centre), pull the
+//        lever from its cover, the gate (96) latches open. Checkpoint past it.
 //     B. an OVERHEAD beam (3b, col 104) sweeps the exit corridor — a floor box
 //        casts no useful side-shadow under it, so it's a forced solo run: time
 //        the dash through when the beam is at the far side.
@@ -123,6 +124,7 @@ LEVELS.push({
   entities: [
     { t: 'hint', x: 16, y: 16, text: '↓' },          // crouch in the grass to hide from the beam
     { t: 'hint', x: 81, y: 18, text: 'X' },          // the box: push it into the beam as a moving shadow
+    { t: 'hint', x: 86, y: 18, text: '↓' },          // crouch fully behind the box (standing leaves the head lit)
     // LIGHT 1 — wide slow sweep over the whole yard
     { t: 'light', x: 28, y: 3, a0: 0.88, a1: 2.18, speed: 0.13, len: 22, fov: 0.34 },
     { t: 'check', x: 48, y: 18, idx: 0 },            // past the yard, safe

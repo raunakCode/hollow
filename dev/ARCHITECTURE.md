@@ -69,7 +69,7 @@ Game.js should derive `level = { w, h, rows }` from this (`w` = row length,
 {t:'door',  x,y, h:3, links:['id'], mode:'all'|'any', latch:true}
 {t:'lever', x,y, id:'id', on:false}
 {t:'plate', x,y, id:'id', w:2, hold:0}        // y = tile the plate sits IN (top of floor)
-{t:'light', x,y, a0,a1, speed:0.5, phase:0, len:11, fov:0.30, offWhen:'id'}  // angles in radians; y/x = fixture tile. offWhen: signal id that powers the cone DOWN (disabled = no detection, dims in render)
+{t:'light', x,y, a0,a1, speed:0.5, phase:0, len:11, fov:0.30, offWhen:'id'}  // angles in radians; y/x = fixture tile. a0==a1 & speed:0 = a STEADY beam (no sweep, no timing gap). offWhen: signal id that powers the cone DOWN (disabled = no detection, dims in render)
 {t:'husk',  x,y, group:'a'}                    // y = tile whose bottom is the feet; group = which helm drives it (default null)
 {t:'helm',  x,y, group:'a'}                    // 1×2-tile interaction zone; controls husks of its group (null group = ALL husks)
 {t:'lift',  ax,ay, bx,by, w:2, travel:3, off:0, lock:'id'}  // counterweight: A at ay-off, B at by+off
@@ -168,10 +168,12 @@ game.js `updatePlay` calls `setWaterLevel` each frame via `waterProximity(level,
   whose `lock` signal is active is frozen in place — the brake);
   `updateTriggers(world, player)` (scripted chase zones; fires once on enter);
   `updateLights(world, level, player, hidden, dt) → {killed, danger}`
-  (`hidden` = crouching in grass; handles occlusion raycast vs tiles/boxes/
-  doors; a light whose `offWhen` signal is active sets `Lt.disabled`, skips
-  detection, and dims in render); `updateCreatures(world, level, player, dt) →
-  {killed, danger}`.
+  (`hidden` = crouching in grass; detection samples the player's **head AND
+  centre** via `lightSeesPoint(Lt, level, world, px, py)` — lit if either has an
+  unobstructed line — so box cover only protects you if you crouch fully behind
+  it; occlusion raycast vs tiles/boxes/doors; a light whose `offWhen` signal is
+  active sets `Lt.disabled`, skips detection, and dims in render);
+  `updateCreatures(world, level, player, dt) → {killed, danger}`.
 - `creatureStartCharge(c, px)` — force a creature into an immediate lunge toward
   world-x `px`; shared by the natural alert→charge path and trigger zones.
 - Levers/helms do NOT self-update: game.js handles `Input.actPressed()`

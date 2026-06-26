@@ -209,9 +209,10 @@ LEVELS.push({
 // leading into the Core chamber and the ending cinematic (the one new engine
 // feature — see game.js updateEnding). Flat interior floor (rows 19-23), warm
 // glow building toward the Core. 170x24, seed 108. No hints.
-//   ROOM A — THE GLARE: two searchlights guard a roofed strip (can't be jumped
-//     over). Push the box through as a rolling shadow-shield onto plate pA,
-//     which latches the exit gate d_a (lights + box + plate).
+//   ROOM A — THE GLARE: one STEADY beam aimed back down a roofed strip (can't
+//     be jumped over, can't be outrun — it never sweeps). Push the box east as
+//     a rolling shadow-shield, CROUCH-walking fully in its shadow, onto plate
+//     pA, which latches the exit gate d_a (steady beam + box + plate).
 //   ROOM B — THE HOLLOW: a husk SEALED in a basement under the main floor (the
 //     player can't get in, the husk can't get out). Connect at the helm, drive
 //     the husk onto pB to latch the player's gate d_b (husk + helm; the camera
@@ -264,13 +265,20 @@ LEVELS.push({
   playerStart: [3, 18],
   entities: [
     // ---- ROOM A — THE GLARE (cols 1-44) ----
-    // Two searchlights sweep a roofed strip (rows 13-15 over cols 12-33) -> a
-    // beam can't be jumped over. Push the box (rolling shadow) through onto pA;
-    // pA latches the floor-to-roof gate d_a. The box is required: the two sweeps
-    // overlap so there's no clean run window across the strip.
+    // One STEADY glare-beam at the far (east) end of a roofed strip (roof rows
+    // 13-15 over cols 12-33), aimed straight back down the corridor. It never
+    // sweeps -> there's no timing gap to dash through, and the roof blocks
+    // jumping over it, so the lit strip is impassable on foot. The box is the
+    // only cover: push it east AHEAD of you and CROUCH-walk in its shadow (the
+    // box is ~1 tile and you're ~1.3 standing, so standing leaves your head in
+    // the beam — crouch to tuck fully behind it). It rolls onto pA, latching the
+    // exit gate d_a, and on through. (Earlier this was two SWEEPING lights and
+    // you could just outrun the overlap; the steady beam fixes that. Detection
+    // samples the head too, so the box must actually cover you — see DESIGN
+    // Ch.8 Room A.) Aimed west (PI) so the player, entering from the west, is
+    // always on the shielded side of the box.
     { t: 'box', x: 7, y: 18 },
-    { t: 'light', x: 18, y: 16, a0: 0.55, a1: 1.20, speed: 0.17, len: 9, fov: 0.5 },
-    { t: 'light', x: 30, y: 16, a0: 1.95, a1: 2.60, speed: 0.14, len: 9, fov: 0.5 },
+    { t: 'light', x: 33, y: 17, a0: 3.14159, a1: 3.14159, speed: 0, len: 22, fov: 0.8 },  // fixed glare, aimed west
     { t: 'plate', x: 35, y: 18, w: 2, id: 'pA' },
     { t: 'door', x: 39, y: 13, h: 6, links: ['pA'], latch: true },     // d_a exit gate
     { t: 'check', x: 42, y: 17, idx: 0 },
